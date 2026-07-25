@@ -1,8 +1,5 @@
 [apt]
-packages = [
-    "libzbar0",
-    "ffmpeg"
-]
+packages = ["libzbar0"]
 
 [build]
 install = ["pip install -r requirements.txt"]

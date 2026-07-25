@@ -14,14 +14,21 @@ from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQu
 import yt_dlp
 from pydub import AudioSegment
 from PIL import Image
-import fitz  # PyMuPDF for PDF handling
+import fitz  # PyMuPDF
 from docx import Document
 from pptx import Presentation
 from openpyxl import load_workbook
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
-from pyzbar.pyzbar import decode
-import io
+
+# ---- QR Code reader with fallback ----
+try:
+    from pyzbar.pyzbar import decode
+    QR_AVAILABLE = True
+except ImportError:
+    decode = None
+    QR_AVAILABLE = False
+    print("⚠️ QR code reading disabled: pyzbar library not available (libzbar missing)")
 
 # ========== CONFIGURATION ==========
 TOKEN = "8866299232:AAECrRPPu5cfRMxx3J1i4CkICw4F4G861DA"  # Replace with your token
@@ -35,7 +42,7 @@ ADMIN_IDS = [310141017]  # Replace with your user ID
 
 # ========== TEMPORARY STORAGE ==========
 temp_storage = {}
-user_sessions = {}  # Track user session state
+user_sessions = {}
 
 # ========== LANGUAGE DICTIONARY ==========
 LANG = {
@@ -57,8 +64,6 @@ LANG = {
         'processing': "🔄 در حال پردازش...",
         'download_complete': "✅ عملیات با موفقیت انجام شد!",
         'error': "❌ خطا رخ داد. لطفاً دوباره تلاش کنید.",
-        
-        # Menu items
         'menu_video_convert': "🎬 تبدیل ویدیو به MP4",
         'menu_audio_convert': "🎵 تبدیل صدا به MP3",
         'menu_youtube': "📥 دانلود از یوتیوب",
@@ -76,8 +81,6 @@ LANG = {
         'menu_unit_convert': "📏 تبدیل واحدها",
         'menu_link_download': "🔗 دانلود از لینک",
         'back': "🔙 بازگشت به منوی اصلی",
-        
-        # Feature-specific messages
         'send_video': "🎬 لطفاً یک ویدیو ارسال کنید.",
         'send_audio': "🎵 لطفاً یک فایل صوتی ارسال کنید.",
         'send_image': "🖼 لطفاً یک تصویر ارسال کنید.",
@@ -122,8 +125,6 @@ LANG = {
         'processing': "🔄 Processing...",
         'download_complete': "✅ Operation completed successfully!",
         'error': "❌ An error occurred. Please try again.",
-        
-        # Menu items
         'menu_video_convert': "🎬 Convert Video to MP4",
         'menu_audio_convert': "🎵 Convert Audio to MP3",
         'menu_youtube': "📥 Download from YouTube",
@@ -141,8 +142,6 @@ LANG = {
         'menu_unit_convert': "📏 Unit Converter",
         'menu_link_download': "🔗 Download from Link",
         'back': "🔙 Back to Main Menu",
-        
-        # Feature-specific messages
         'send_video': "🎬 Please send a video.",
         'send_audio': "🎵 Please send an audio file.",
         'send_image': "🖼 Please send an image.",
@@ -181,7 +180,6 @@ logger = logging.getLogger(__name__)
 # ========== USER DATA ==========
 user_lang = {}
 user_subscribed = {}
-user_sessions = {}
 USER_DATA_FILE = 'user_data.json'
 
 def load_user_data():
@@ -326,7 +324,6 @@ async def download_link_to_file(url: str, output_path: str):
         return False
 
 def images_to_pdf(image_paths, output_path):
-    """Convert multiple images to PDF"""
     try:
         images = []
         for path in image_paths:
@@ -343,7 +340,6 @@ def images_to_pdf(image_paths, output_path):
         return False
 
 def pdf_to_images(pdf_path, output_dir):
-    """Convert PDF to images"""
     try:
         doc = fitz.open(pdf_path)
         image_paths = []
@@ -360,7 +356,6 @@ def pdf_to_images(pdf_path, output_dir):
         return None
 
 def generate_qr_code(text, output_path):
-    """Generate QR code from text"""
     try:
         qr = qrcode.QRCode(version=1, box_size=10, border=5)
         qr.add_data(text)
@@ -373,7 +368,8 @@ def generate_qr_code(text, output_path):
         return False
 
 def read_qr_code(image_path):
-    """Read QR code from image"""
+    if not QR_AVAILABLE:
+        return None
     try:
         img = Image.open(image_path)
         decoded = decode(img)
@@ -385,7 +381,6 @@ def read_qr_code(image_path):
         return None
 
 def create_zip(file_paths, output_path):
-    """Create ZIP archive from files"""
     try:
         with zipfile.ZipFile(output_path, 'w') as zipf:
             for file_path in file_paths:
@@ -396,7 +391,6 @@ def create_zip(file_paths, output_path):
         return False
 
 def extract_zip(zip_path, output_dir):
-    """Extract ZIP archive"""
     try:
         with zipfile.ZipFile(zip_path, 'r') as zipf:
             zipf.extractall(output_dir)
@@ -406,13 +400,11 @@ def extract_zip(zip_path, output_dir):
         return False
 
 def doc_to_pdf(input_path, output_path):
-    """Convert Word/PPT/Excel to PDF"""
     try:
         ext = os.path.splitext(input_path)[1].lower()
         if ext == '.docx':
             doc = Document(input_path)
             c = canvas.Canvas(output_path, pagesize=letter)
-            # Simple conversion - extracts text
             for para in doc.paragraphs:
                 if para.text:
                     c.drawString(50, 750, para.text[:100])
@@ -449,7 +441,6 @@ def doc_to_pdf(input_path, output_path):
         return False
 
 def text_to_pdf(text, output_path):
-    """Convert text to PDF"""
     try:
         c = canvas.Canvas(output_path, pagesize=letter)
         y = 750
@@ -466,7 +457,6 @@ def text_to_pdf(text, output_path):
         return False
 
 def extract_audio_from_video(input_path, output_path):
-    """Extract audio from video using FFmpeg"""
     try:
         cmd = ['ffmpeg', '-i', input_path, '-vn', '-acodec', 'mp3', '-ab', '192k', '-y', output_path]
         result = subprocess.run(cmd, capture_output=True, text=True)
@@ -476,7 +466,6 @@ def extract_audio_from_video(input_path, output_path):
         return False
 
 def unit_converter(value, from_unit, to_unit, category):
-    """Convert units"""
     conversions = {
         'length': {
             'meter': 1, 'kilometer': 1000, 'centimeter': 0.01,
@@ -500,7 +489,6 @@ def unit_converter(value, from_unit, to_unit, category):
             'quart': 0.946353, 'pint': 0.473176, 'cup': 0.236588
         }
     }
-    
     try:
         if category == 'temperature':
             if from_unit == 'celsius' and to_unit == 'fahrenheit':
@@ -572,7 +560,6 @@ async def toggle_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
     new_lang = 'en' if current == 'fa' else 'fa'
     user_lang[user_id] = new_lang
     
-    # Check if user is subscribed
     if await check_subscription(user_id, context):
         await query.edit_message_text(
             LANG[new_lang]['subscribed'],
@@ -597,7 +584,6 @@ async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = query.from_user.id
     lang = user_lang.get(user_id, 'fa')
     
-    # Clear session
     if user_id in user_sessions:
         del user_sessions[user_id]
     
@@ -614,7 +600,6 @@ async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
     lang = user_lang.get(user_id, 'fa')
     
-    # Check subscription first
     if not await check_subscription(user_id, context):
         await query.edit_message_text(
             LANG[lang]['not_allowed'],
@@ -623,7 +608,6 @@ async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
     
-    # Handle menu selections
     menu_actions = {
         'menu_video_convert': ('🎬', 'send_video', 'video_conversion', build_back_button),
         'menu_audio_convert': ('🎵', 'send_audio', 'audio_conversion', build_back_button),
@@ -645,8 +629,6 @@ async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if data in menu_actions:
         icon, prompt, session_type, keyboard_func = menu_actions[data]
-        
-        # Set user session
         user_sessions[user_id] = {'state': session_type, 'files': []}
         
         if data == 'menu_unit_convert':
@@ -690,7 +672,6 @@ async def unit_convert_callback(update: Update, context: ContextTypes.DEFAULT_TY
         await main_menu(update, context)
         return
     
-    # Store unit category in session
     if user_id not in user_sessions:
         user_sessions[user_id] = {}
     user_sessions[user_id]['unit_category'] = data.replace('unit_', '')
@@ -727,7 +708,6 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     session = user_sessions.get(user_id, {})
     state = session.get('state', '')
     
-    # Handle different states
     if state == 'video_conversion':
         await handle_video_conversion(update, context)
     elif state == 'audio_conversion':
@@ -885,7 +865,6 @@ async def handle_image_to_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE
         return
     
     if len(session['files']) >= 5:
-        # Create PDF
         await create_pdf_from_images(update, context)
     else:
         keyboard = [
@@ -937,14 +916,12 @@ async def create_pdf_from_images(update: Update, context: ContextTypes.DEFAULT_T
         else:
             await query.edit_message_text(LANG[lang]['error'])
         
-        # Clean up
         for path in image_paths:
             if os.path.exists(path):
                 os.unlink(path)
         if os.path.exists(output_path):
             os.unlink(output_path)
         
-        # Clear session
         user_sessions[user_id] = {'state': None, 'files': []}
         
     except Exception as e:
@@ -1014,6 +991,14 @@ async def handle_qr_generate(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await processing_msg.edit_text(LANG[lang]['error'])
 
 async def handle_qr_read(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Fallback if library missing
+    if not QR_AVAILABLE:
+        await update.message.reply_text(
+            "❌ QR Code reading is currently disabled because the system library (libzbar) is missing.\n"
+            "Please contact the bot administrator."
+        )
+        return
+    
     user_id = update.effective_user.id
     lang = user_lang.get(user_id, 'fa')
     
@@ -1150,7 +1135,6 @@ async def handle_zip_extract(update: Update, context: ContextTypes.DEFAULT_TYPE)
         success = extract_zip(zip_path, output_dir)
         
         if success:
-            # Send extracted files
             for filename in os.listdir(output_dir):
                 file_path = os.path.join(output_dir, filename)
                 if os.path.isfile(file_path):
@@ -1299,7 +1283,6 @@ async def handle_unit_conversion(update: Update, context: ContextTypes.DEFAULT_T
         return
     
     try:
-        # Parse input: "10 meter to kilometer"
         parts = text.lower().split(' to ')
         if len(parts) != 2:
             await update.message.reply_text(
@@ -1311,7 +1294,6 @@ async def handle_unit_conversion(update: Update, context: ContextTypes.DEFAULT_T
         value_str = parts[0].strip()
         to_unit = parts[1].strip()
         
-        # Extract value and from_unit
         value_parts = value_str.split()
         if len(value_parts) < 2:
             await update.message.reply_text(
@@ -1323,7 +1305,6 @@ async def handle_unit_conversion(update: Update, context: ContextTypes.DEFAULT_T
         value = float(value_parts[0])
         from_unit = ' '.join(value_parts[1:])
         
-        # Determine category
         category = user_sessions.get(user_id, {}).get('unit_category', 'length')
         
         result = unit_converter(value, from_unit, to_unit, category)
@@ -1730,57 +1711,46 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = query.from_user.id
     lang = user_lang.get(user_id, 'fa')
     
-    # Handle main menu navigation
     if data == "main_menu":
         await main_menu(update, context)
         return
     
-    # Handle subscription check
     if data == "check_subscription":
         await check_subscription_callback(update, context)
         return
     
-    # Handle language toggle
     if data == "toggle_lang":
         await toggle_language(update, context)
         return
     
-    # Handle create_pdf
     if data == "create_pdf":
         await create_pdf_from_images(update, context)
         return
     
-    # Handle create_zip
     if data == "create_zip":
         await create_zip_from_files(update, context)
         return
     
-    # Handle unit converter
     if data.startswith("unit_"):
         await unit_convert_callback(update, context)
         return
     
-    # Handle video conversion
     if data.startswith("vidconv_"):
         await video_conversion_callback(update, context)
         return
     
-    # Handle image conversion
     if data.startswith("imgconv_"):
         await image_conversion_callback(update, context)
         return
     
-    # Handle YouTube
     if data.startswith("yt_"):
         await youtube_callback(update, context)
         return
     
-    # Handle Instagram
     if data.startswith("insta_"):
         await instagram_callback(update, context)
         return
     
-    # Handle menu selections
     menu_options = [
         'menu_video_convert', 'menu_audio_convert', 'menu_youtube', 'menu_instagram',
         'menu_image_convert', 'menu_image_to_pdf', 'menu_pdf_to_image', 'menu_qr_generate',
@@ -1797,19 +1767,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     lang = user_lang.get(user_id, 'fa')
     text = update.message.text or ""
     
-    # Check if user is in a session
     session = user_sessions.get(user_id, {})
     state = session.get('state', '')
     
     if text and text.startswith('/'):
         return
     
-    # Check for direct link
     if text.startswith('http') and not state:
         await handle_link(update, context, text)
         return
     
-    # Handle based on session state
     if state in ['video_conversion', 'audio_conversion', 'image_conversion', 'image_to_pdf',
                  'pdf_to_image', 'qr_read', 'zip_extract', 'doc_to_pdf', 'audio_extract',
                  'zip_compress', 'link_download', 'unit_value', 'text_to_pdf', 'qr_generate']:
@@ -1819,7 +1786,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif state in ['instagram_download']:
         await handle_instagram(update, context)
     else:
-        # Check if user is subscribed before showing menu
         if await check_subscription(user_id, context):
             await update.message.reply_text(
                 LANG[lang]['main_menu'],
@@ -1888,7 +1854,7 @@ def main():
     print("  📄 Image to PDF")
     print("  📄 PDF to Image")
     print("  🔲 QR Code Generator")
-    print("  🔍 QR Code Reader")
+    print("  🔍 QR Code Reader", "(disabled if libzbar missing)" if not QR_AVAILABLE else "")
     print("  📦 ZIP Compressor")
     print("  📂 ZIP Extractor")
     print("  📄 Document to PDF (Word/PPT/Excel)")
