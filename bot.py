@@ -13,7 +13,7 @@ from PIL import Image
 
 # ========== CONFIGURATION ==========
 # 🔴 Replace with your actual bot token
-TOKEN = "8832684689:AAF7jtsSopJYoHkPQvtOePMUchVLniOu4Oo"   # Replace with your token
+TOKEN = "8866299232:AAECrRPPu5cfRMxx3J1i4CkICw4F4G861DA"   # Replace with your token
 
 # Your channels
 CHANNELS = [
