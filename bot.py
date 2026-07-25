@@ -27,10 +27,11 @@ LANG = {
         'subscribed': "✅ **تبریک! شما در تمام کانال‌ها عضو هستید.**\n\n"
                       "🎵 حالا می‌توانید:\n"
                       "• یک فایل صوتی ارسال کنید تا به MP3 تبدیل شود\n"
-                      "• یک لینک یوتیوب ارسال کنید تا دانلود شود",
+                      "• یک لینک یوتیوب ارسال کنید تا دانلود شود\n"
+                      "• یک لینک اینستاگرام (ریل) ارسال کنید تا دانلود شود",
         'not_subscribed': "❌ **شما هنوز در تمام کانال‌ها عضو نشده‌اید.**\n\n"
                           "لطفاً روی لینک کانال‌های زیر کلیک کرده و عضو شوید، سپس دوباره روی دکمه **بررسی عضویت** کلیک کنید.",
-        'send_prompt': "👋 سلام! لطفاً یک فایل صوتی یا لینک یوتیوب ارسال کنید.",
+        'send_prompt': "👋 سلام! لطفاً یک فایل صوتی، لینک یوتیوب یا لینک اینستاگرام ارسال کنید.",
         'converting': "🔄 در حال تبدیل فایل به MP3...",
         'conversion_error': "❌ خطا در تبدیل فایل. لطفاً دوباره تلاش کنید.",
         'youtube_processing': "🔄 در حال دریافت اطلاعات از یوتیوب...",
@@ -48,6 +49,11 @@ LANG = {
         'not_allowed': "❌ **دسترسی محدود شده است.**\n\nلطفاً ابتدا در کانال‌های زیر عضو شوید:",
         'help': "برای راهنمایی بیشتر از /start استفاده کنید.",
         'audio_sent': "🎵 فایل MP3 با کیفیت بالا",
+        'instagram_processing': "🔄 در حال دریافت اطلاعات از اینستاگرام...",
+        'instagram_downloading': "🔄 در حال دانلود ریل اینستاگرام...",
+        'instagram_error': "❌ خطا در دریافت اطلاعات. لطفاً لینک معتبر اینستاگرام ارسال کنید.",
+        'instagram_caption': "📸 ریل اینستاگرام\n{title}",
+        'instagram_audio_caption': "🎵 صدای استخراج شده از ریل اینستاگرام",
     },
     'en': {
         'welcome': "🎵 **Audio Converter & Downloader**\n\n"
@@ -57,10 +63,11 @@ LANG = {
         'subscribed': "✅ **Congratulations! You are subscribed to all channels.**\n\n"
                       "🎵 Now you can:\n"
                       "• Send an audio file to convert to MP3\n"
-                      "• Send a YouTube link to download",
+                      "• Send a YouTube link to download\n"
+                      "• Send an Instagram link (Reel) to download",
         'not_subscribed': "❌ **You haven't joined all channels yet.**\n\n"
                           "Please click the channel links below and join, then click the **Check Subscription** button again.",
-        'send_prompt': "👋 Hello! Please send an audio file or a YouTube link.",
+        'send_prompt': "👋 Hello! Please send an audio file, a YouTube link, or an Instagram link.",
         'converting': "🔄 Converting file to MP3...",
         'conversion_error': "❌ Conversion failed. Please try again.",
         'youtube_processing': "🔄 Fetching video information from YouTube...",
@@ -78,6 +85,11 @@ LANG = {
         'not_allowed': "❌ **Access restricted.**\n\nPlease join the channels below first:",
         'help': "Use /start for more information.",
         'audio_sent': "🎵 High Quality MP3",
+        'instagram_processing': "🔄 Fetching information from Instagram...",
+        'instagram_downloading': "🔄 Downloading Instagram Reel...",
+        'instagram_error': "❌ Error fetching information. Please send a valid Instagram link.",
+        'instagram_caption': "📸 Instagram Reel\n{title}",
+        'instagram_audio_caption': "🎵 Audio extracted from Instagram Reel",
     }
 }
 
@@ -119,13 +131,20 @@ def build_channel_keyboard(lang: str):
 
 def build_quality_keyboard(title: str, url: str, lang: str, formats):
     keyboard = []
-    # Detect available resolutions
     for res in ['1080p', '720p', '480p', '360p']:
         height = int(res.replace('p', ''))
         if any(f.get('height') == height for f in formats):
             keyboard.append([InlineKeyboardButton(f"📹 Video {res}", callback_data=f"video_{res}_{url}")])
     keyboard.append([InlineKeyboardButton("🎵 MP3 Audio", callback_data=f"audio_{url}")])
     keyboard.append([InlineKeyboardButton(LANG[lang]['cancel'], callback_data="cancel")])
+    return InlineKeyboardMarkup(keyboard)
+
+def build_instagram_keyboard(title: str, url: str, lang: str):
+    keyboard = [
+        [InlineKeyboardButton("📹 Video (MP4)", callback_data=f"insta_video_{url}")],
+        [InlineKeyboardButton("🎵 Audio (MP3)", callback_data=f"insta_audio_{url}")],
+        [InlineKeyboardButton(LANG[lang]['cancel'], callback_data="cancel")]
+    ]
     return InlineKeyboardMarkup(keyboard)
 
 # ========== AUDIO CONVERSION ==========
@@ -250,7 +269,7 @@ async def handle_audio(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"Audio processing error: {e}")
         await processing_msg.edit_text(LANG[lang]['conversion_error'])
 
-# ========== YOUTUBE HANDLERS (FIXED) ==========
+# ========== YOUTUBE HANDLERS ==========
 async def handle_youtube(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     lang = user_lang.get(user_id, 'fa')
@@ -266,20 +285,19 @@ async def handle_youtube(update: Update, context: ContextTypes.DEFAULT_TYPE):
     url = update.message.text.strip()
     processing_msg = await update.message.reply_text(LANG[lang]['youtube_processing'])
     
-    # Modern yt-dlp options with extractor_args and proper headers
     ydl_opts = {
         'quiet': True,
         'no_warnings': True,
         'extractor_args': {
             'youtube': {
-                'player_client': ['tv', 'web'],  # Use multiple clients for compatibility
-                'skip': ['dash', 'hls'],          # Skip unnecessary formats
+                'player_client': ['tv', 'web'],
+                'skip': ['dash', 'hls'],
             }
         },
         'headers': {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         },
-        'ignoreerrors': True,  # Continue if some formats fail
+        'ignoreerrors': True,
     }
     
     try:
@@ -398,14 +416,155 @@ async def download_youtube_audio(query, url, lang):
         logger.error(f"Audio download error: {e}")
         await query.edit_message_text(LANG[lang]['youtube_error'])
 
+# ========== INSTAGRAM HANDLERS ==========
+async def handle_instagram(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    lang = user_lang.get(user_id, 'fa')
+    
+    if not await check_subscription(user_id, context):
+        await update.message.reply_text(
+            LANG[lang]['not_allowed'],
+            reply_markup=build_channel_keyboard(lang),
+            parse_mode="Markdown"
+        )
+        return
+    
+    url = update.message.text.strip()
+    processing_msg = await update.message.reply_text(LANG[lang]['instagram_processing'])
+    
+    ydl_opts = {
+        'quiet': True,
+        'no_warnings': True,
+        'headers': {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        },
+        'ignoreerrors': True,
+        'extract_flat': False,
+    }
+    
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+            if info is None:
+                raise Exception("No info extracted")
+            title = info.get('title', 'Instagram Reel')
+            # Remove "Instagram" from title if present
+            title = title.replace('Instagram', '').strip()
+            
+            keyboard = build_instagram_keyboard(title, url, lang)
+            await processing_msg.edit_text(
+                f"📸 **{title}**\n\n{LANG[lang]['lang_prompt']}",
+                reply_markup=keyboard,
+                parse_mode="Markdown"
+            )
+    except Exception as e:
+        logger.error(f"Instagram error: {e}")
+        await processing_msg.edit_text(LANG[lang]['instagram_error'])
+
+async def instagram_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    data = query.data
+    user_id = query.from_user.id
+    lang = user_lang.get(user_id, 'fa')
+    
+    if data == "cancel":
+        await query.edit_message_text(LANG[lang]['cancel'])
+        return
+    
+    parts = data.split('_')
+    if parts[0] == "insta":
+        if parts[1] == "video":
+            url = '_'.join(parts[2:])
+            await download_instagram_video(query, url, lang)
+        elif parts[1] == "audio":
+            url = '_'.join(parts[2:])
+            await download_instagram_audio(query, url, lang)
+
+async def download_instagram_video(query, url, lang):
+    await query.edit_message_text(LANG[lang]['instagram_downloading'])
+    try:
+        ydl_opts = {
+            'format': 'best[ext=mp4]/best',
+            'outtmpl': '%(title)s.%(ext)s',
+            'quiet': True,
+            'no_warnings': True,
+            'headers': {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            },
+            'ignoreerrors': True,
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            if info is None:
+                raise Exception("Download failed")
+            filepath = ydl.prepare_filename(info)
+            title = info.get('title', 'Instagram Reel')
+            title = title.replace('Instagram', '').strip()
+            
+            with open(filepath, 'rb') as video_file:
+                await query.message.reply_video(
+                    video=video_file,
+                    caption=LANG[lang]['instagram_caption'].format(title=title)
+                )
+            os.unlink(filepath)
+        await query.edit_message_text(LANG[lang]['download_complete'])
+    except Exception as e:
+        logger.error(f"Instagram video download error: {e}")
+        await query.edit_message_text(LANG[lang]['instagram_error'])
+
+async def download_instagram_audio(query, url, lang):
+    await query.edit_message_text(LANG[lang]['instagram_downloading'])
+    try:
+        ydl_opts = {
+            'format': 'bestaudio[ext=m4a]/bestaudio/best',
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }],
+            'outtmpl': '%(title)s.%(ext)s',
+            'quiet': True,
+            'no_warnings': True,
+            'headers': {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            },
+            'ignoreerrors': True,
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            if info is None:
+                raise Exception("Download failed")
+            filepath = ydl.prepare_filename(info).replace('.webm', '.mp3')
+            title = info.get('title', 'Instagram Reel')
+            title = title.replace('Instagram', '').strip()
+            
+            with open(filepath, 'rb') as audio_file:
+                await query.message.reply_audio(
+                    audio=audio_file,
+                    performer="Instagram",
+                    title=title,
+                    caption=LANG[lang]['instagram_audio_caption']
+                )
+            os.unlink(filepath)
+        await query.edit_message_text(LANG[lang]['download_complete'])
+    except Exception as e:
+        logger.error(f"Instagram audio download error: {e}")
+        await query.edit_message_text(LANG[lang]['instagram_error'])
+
 # ========== MESSAGE HANDLER ==========
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     lang = user_lang.get(user_id, 'fa')
     text = update.message.text or ""
     
+    # Check for YouTube links
     if "youtube.com" in text.lower() or "youtu.be" in text.lower():
         await handle_youtube(update, context)
+    # Check for Instagram links
+    elif "instagram.com" in text.lower() or "instagr.am" in text.lower():
+        await handle_instagram(update, context)
+    # Check for audio files
     elif update.message.audio or update.message.voice or update.message.document:
         await handle_audio(update, context)
     else:
@@ -419,12 +578,14 @@ def main():
     app.add_handler(CallbackQueryHandler(toggle_language, pattern="toggle_lang"))
     app.add_handler(CallbackQueryHandler(youtube_callback, pattern="video_"))
     app.add_handler(CallbackQueryHandler(youtube_callback, pattern="audio_"))
+    app.add_handler(CallbackQueryHandler(instagram_callback, pattern="insta_"))
     app.add_handler(CallbackQueryHandler(youtube_callback, pattern="cancel"))
     app.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, handle_message))
     
     print("🤖 Combined Bot is running...")
     print("✅ Audio Converter: Ready")
     print("✅ YouTube Downloader: Ready (with latest yt-dlp fixes)")
+    print("✅ Instagram Reel Downloader: Ready")
     print("✅ Subscription Check: Enabled")
     print("✅ Language Toggle: Enabled")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
