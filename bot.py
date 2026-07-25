@@ -8,8 +8,16 @@ import yt_dlp
 from pydub import AudioSegment
 
 # ========== CONFIGURATION ==========
-# 🔴 Replace with your NEW bot token
+# Read token from environment variable (SECURE)
 TOKEN = os.getenv('8866299232:AAF_Dsvc4-RfYtecbBadN3I6cd1ZRtGjUXE')
+
+# If token is missing, raise an error
+if not TOKEN:
+    raise ValueError(
+        "❌ TELEGRAM_BOT_TOKEN environment variable is not set!\n"
+        "Please add it in Railway's Variables tab or set it locally with:\n"
+        "  export TELEGRAM_BOT_TOKEN='your_token_here'"
+    )
 
 # Your channels
 CHANNELS = [
@@ -448,7 +456,6 @@ async def handle_instagram(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if info is None:
                 raise Exception("No info extracted")
             title = info.get('title', 'Instagram Reel')
-            # Remove "Instagram" from title if present
             title = title.replace('Instagram', '').strip()
             
             keyboard = build_instagram_keyboard(title, url, lang)
@@ -558,13 +565,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     lang = user_lang.get(user_id, 'fa')
     text = update.message.text or ""
     
-    # Check for YouTube links
     if "youtube.com" in text.lower() or "youtu.be" in text.lower():
         await handle_youtube(update, context)
-    # Check for Instagram links
     elif "instagram.com" in text.lower() or "instagr.am" in text.lower():
         await handle_instagram(update, context)
-    # Check for audio files
     elif update.message.audio or update.message.voice or update.message.document:
         await handle_audio(update, context)
     else:
