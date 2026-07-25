@@ -405,9 +405,11 @@ def doc_to_pdf(input_path, output_path):
         if ext == '.docx':
             doc = Document(input_path)
             c = canvas.Canvas(output_path, pagesize=letter)
+            y = 750
             for para in doc.paragraphs:
                 if para.text:
-                    c.drawString(50, 750, para.text[:100])
+                    c.drawString(50, y, para.text[:100])
+                    y -= 20
             c.save()
             return True
         elif ext == '.pptx':
@@ -515,6 +517,8 @@ def unit_converter(value, from_unit, to_unit, category):
 # ========== START & SUBSCRIPTION ==========
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
+    if not user:
+        return
     track_user(user.id, user.username, user.first_name, user.last_name, 'start')
     user_id = user.id
     if user_id not in user_lang:
@@ -535,7 +539,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def check_subscription_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    user_id = query.from_user.id
+    user = query.from_user
+    if not user:
+        return
+    user_id = user.id
     lang = user_lang.get(user_id, 'fa')
     
     if await check_subscription(user_id, context):
@@ -555,7 +562,10 @@ async def check_subscription_callback(update: Update, context: ContextTypes.DEFA
 async def toggle_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    user_id = query.from_user.id
+    user = query.from_user
+    if not user:
+        return
+    user_id = user.id
     current = user_lang.get(user_id, 'fa')
     new_lang = 'en' if current == 'fa' else 'fa'
     user_lang[user_id] = new_lang
@@ -581,7 +591,10 @@ async def toggle_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    user_id = query.from_user.id
+    user = query.from_user
+    if not user:
+        return
+    user_id = user.id
     lang = user_lang.get(user_id, 'fa')
     
     if user_id in user_sessions:
@@ -596,7 +609,10 @@ async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    user_id = query.from_user.id
+    user = query.from_user
+    if not user:
+        return
+    user_id = user.id
     data = query.data
     lang = user_lang.get(user_id, 'fa')
     
@@ -665,7 +681,10 @@ async def unit_convert_callback(update: Update, context: ContextTypes.DEFAULT_TY
     query = update.callback_query
     await query.answer()
     data = query.data
-    user_id = query.from_user.id
+    user = query.from_user
+    if not user:
+        return
+    user_id = user.id
     lang = user_lang.get(user_id, 'fa')
     
     if data == "main_menu":
@@ -694,7 +713,10 @@ async def unit_convert_callback(update: Update, context: ContextTypes.DEFAULT_TY
 
 # ========== FILE HANDLING ==========
 async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
+    user = update.effective_user
+    if not user:
+        return
+    user_id = user.id
     lang = user_lang.get(user_id, 'fa')
     
     if not await check_subscription(user_id, context):
@@ -748,7 +770,10 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ========== FEATURE HANDLERS ==========
 async def handle_video_conversion(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
+    user = update.effective_user
+    if not user:
+        return
+    user_id = user.id
     lang = user_lang.get(user_id, 'fa')
     
     video = update.message.video
@@ -773,7 +798,10 @@ async def handle_video_conversion(update: Update, context: ContextTypes.DEFAULT_
     )
 
 async def handle_audio_conversion(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
+    user = update.effective_user
+    if not user:
+        return
+    user_id = user.id
     lang = user_lang.get(user_id, 'fa')
     
     file = update.message.audio or update.message.voice
@@ -808,7 +836,10 @@ async def handle_audio_conversion(update: Update, context: ContextTypes.DEFAULT_
         await processing_msg.edit_text(LANG[lang]['error'])
 
 async def handle_image_conversion(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
+    user = update.effective_user
+    if not user:
+        return
+    user_id = user.id
     lang = user_lang.get(user_id, 'fa')
     
     if update.message.photo:
@@ -842,7 +873,10 @@ async def handle_image_conversion(update: Update, context: ContextTypes.DEFAULT_
     )
 
 async def handle_image_to_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
+    user = update.effective_user
+    if not user:
+        return
+    user_id = user.id
     lang = user_lang.get(user_id, 'fa')
     
     if user_id not in user_sessions:
@@ -879,7 +913,10 @@ async def handle_image_to_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def create_pdf_from_images(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    user_id = query.from_user.id
+    user = query.from_user
+    if not user:
+        return
+    user_id = user.id
     lang = user_lang.get(user_id, 'fa')
     
     session = user_sessions.get(user_id, {})
@@ -929,7 +966,10 @@ async def create_pdf_from_images(update: Update, context: ContextTypes.DEFAULT_T
         await query.edit_message_text(LANG[lang]['error'])
 
 async def handle_pdf_to_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
+    user = update.effective_user
+    if not user:
+        return
+    user_id = user.id
     lang = user_lang.get(user_id, 'fa')
     
     doc = update.message.document
@@ -962,7 +1002,10 @@ async def handle_pdf_to_image(update: Update, context: ContextTypes.DEFAULT_TYPE
         await processing_msg.edit_text(LANG[lang]['error'])
 
 async def handle_qr_generate(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
+    user = update.effective_user
+    if not user:
+        return
+    user_id = user.id
     lang = user_lang.get(user_id, 'fa')
     
     text = update.message.text
@@ -991,7 +1034,6 @@ async def handle_qr_generate(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await processing_msg.edit_text(LANG[lang]['error'])
 
 async def handle_qr_read(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Fallback if library missing
     if not QR_AVAILABLE:
         await update.message.reply_text(
             "❌ QR Code reading is currently disabled because the system library (libzbar) is missing.\n"
@@ -999,7 +1041,10 @@ async def handle_qr_read(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
     
-    user_id = update.effective_user.id
+    user = update.effective_user
+    if not user:
+        return
+    user_id = user.id
     lang = user_lang.get(user_id, 'fa')
     
     if update.message.photo:
@@ -1036,7 +1081,10 @@ async def handle_qr_read(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await processing_msg.edit_text(LANG[lang]['error'])
 
 async def handle_zip_compress(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
+    user = update.effective_user
+    if not user:
+        return
+    user_id = user.id
     lang = user_lang.get(user_id, 'fa')
     
     if user_id not in user_sessions:
@@ -1066,7 +1114,10 @@ async def handle_zip_compress(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def create_zip_from_files(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    user_id = query.from_user.id
+    user = query.from_user
+    if not user:
+        return
+    user_id = user.id
     lang = user_lang.get(user_id, 'fa')
     
     session = user_sessions.get(user_id, {})
@@ -1116,7 +1167,10 @@ async def create_zip_from_files(update: Update, context: ContextTypes.DEFAULT_TY
         await query.edit_message_text(LANG[lang]['error'])
 
 async def handle_zip_extract(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
+    user = update.effective_user
+    if not user:
+        return
+    user_id = user.id
     lang = user_lang.get(user_id, 'fa')
     
     doc = update.message.document
@@ -1154,7 +1208,10 @@ async def handle_zip_extract(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await processing_msg.edit_text(LANG[lang]['error'])
 
 async def handle_doc_to_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
+    user = update.effective_user
+    if not user:
+        return
+    user_id = user.id
     lang = user_lang.get(user_id, 'fa')
     
     doc = update.message.document
@@ -1198,7 +1255,10 @@ async def handle_doc_to_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await processing_msg.edit_text(LANG[lang]['error'])
 
 async def handle_text_to_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
+    user = update.effective_user
+    if not user:
+        return
+    user_id = user.id
     lang = user_lang.get(user_id, 'fa')
     
     text = update.message.text
@@ -1231,7 +1291,10 @@ async def handle_text_to_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await processing_msg.edit_text(LANG[lang]['error'])
 
 async def handle_audio_extract(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
+    user = update.effective_user
+    if not user:
+        return
+    user_id = user.id
     lang = user_lang.get(user_id, 'fa')
     
     video = update.message.video
@@ -1271,7 +1334,10 @@ async def handle_audio_extract(update: Update, context: ContextTypes.DEFAULT_TYP
         await processing_msg.edit_text(LANG[lang]['error'])
 
 async def handle_unit_conversion(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
+    user = update.effective_user
+    if not user:
+        return
+    user_id = user.id
     lang = user_lang.get(user_id, 'fa')
     
     text = update.message.text
@@ -1331,7 +1397,10 @@ async def handle_unit_conversion(update: Update, context: ContextTypes.DEFAULT_T
         await update.message.reply_text(LANG[lang]['error'])
 
 async def handle_link(update: Update, context: ContextTypes.DEFAULT_TYPE, url: str):
-    user_id = update.effective_user.id
+    user = update.effective_user
+    if not user:
+        return
+    user_id = user.id
     lang = user_lang.get(user_id, 'fa')
     
     if not url.startswith('http'):
@@ -1367,7 +1436,10 @@ async def handle_link(update: Update, context: ContextTypes.DEFAULT_TYPE, url: s
 
 # ========== YOUTUBE & INSTAGRAM ==========
 async def handle_youtube(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
+    user = update.effective_user
+    if not user:
+        return
+    user_id = user.id
     lang = user_lang.get(user_id, 'fa')
     url = update.message.text.strip()
     
@@ -1411,7 +1483,10 @@ async def handle_youtube(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await processing_msg.edit_text(LANG[lang]['error'])
 
 async def handle_instagram(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
+    user = update.effective_user
+    if not user:
+        return
+    user_id = user.id
     lang = user_lang.get(user_id, 'fa')
     url = update.message.text.strip()
     
@@ -1453,8 +1528,11 @@ async def handle_instagram(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def youtube_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
+    user = query.from_user
+    if not user:
+        return
     data = query.data
-    user_id = query.from_user.id
+    user_id = user.id
     lang = user_lang.get(user_id, 'fa')
     
     parts = data.split('_')
@@ -1530,8 +1608,11 @@ async def download_youtube_audio(query, url, lang):
 async def instagram_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
+    user = query.from_user
+    if not user:
+        return
     data = query.data
-    user_id = query.from_user.id
+    user_id = user.id
     lang = user_lang.get(user_id, 'fa')
     
     parts = data.split('_')
@@ -1608,8 +1689,11 @@ async def download_instagram_audio(query, url, lang):
 async def video_conversion_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
+    user = query.from_user
+    if not user:
+        return
     data = query.data
-    user_id = query.from_user.id
+    user_id = user.id
     lang = user_lang.get(user_id, 'fa')
     
     if data == "main_menu":
@@ -1658,8 +1742,11 @@ async def video_conversion_callback(update: Update, context: ContextTypes.DEFAUL
 async def image_conversion_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
+    user = query.from_user
+    if not user:
+        return
     data = query.data
-    user_id = query.from_user.id
+    user_id = user.id
     lang = user_lang.get(user_id, 'fa')
     
     if data == "main_menu":
@@ -1708,7 +1795,10 @@ async def image_conversion_callback(update: Update, context: ContextTypes.DEFAUL
 async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     data = query.data
-    user_id = query.from_user.id
+    user = query.from_user
+    if not user:
+        return
+    user_id = user.id
     lang = user_lang.get(user_id, 'fa')
     
     if data == "main_menu":
@@ -1763,7 +1853,11 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ========== MAIN MESSAGE HANDLER ==========
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
+    # Guard: if no user (e.g., channel post), ignore
+    user = update.effective_user
+    if not user:
+        return
+    user_id = user.id
     lang = user_lang.get(user_id, 'fa')
     text = update.message.text or ""
     
@@ -1801,7 +1895,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ========== STATS (Admin) ==========
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
+    user = update.effective_user
+    if not user:
+        return
+    user_id = user.id
     if user_id not in ADMIN_IDS:
         await update.message.reply_text("❌ You are not authorized to view stats.")
         return
