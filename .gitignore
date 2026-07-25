@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.env
+*.env
+
+# Nested subfolder (not part of deployment)
+telegram-audio-bot/
+
+# Credentials (never commit these)
+google-credentials.json
+*credentials*.json
+*service-account*.json
+
+# Sensitive text files
+Token telegram.txt
+token*.txt
+*token*.txt
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temp files
+*.tmp
+*.log
