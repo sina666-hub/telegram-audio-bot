@@ -119,8 +119,10 @@ def build_channel_keyboard(lang: str):
 
 def build_quality_keyboard(title: str, url: str, lang: str, formats):
     keyboard = []
+    # Detect available resolutions
     for res in ['1080p', '720p', '480p', '360p']:
-        if any(f.get('height') == int(res.replace('p', '')) for f in formats):
+        height = int(res.replace('p', ''))
+        if any(f.get('height') == height for f in formats):
             keyboard.append([InlineKeyboardButton(f"📹 Video {res}", callback_data=f"video_{res}_{url}")])
     keyboard.append([InlineKeyboardButton("🎵 MP3 Audio", callback_data=f"audio_{url}")])
     keyboard.append([InlineKeyboardButton(LANG[lang]['cancel'], callback_data="cancel")])
@@ -181,7 +183,6 @@ async def toggle_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
     new_lang = 'en' if current == 'fa' else 'fa'
     user_lang[user_id] = new_lang
     
-    # Show welcome message in new language
     message = LANG[new_lang]['welcome']
     for channel in CHANNELS:
         message += LANG[new_lang]['join_channels'].format(name=channel['name'])
@@ -198,7 +199,6 @@ async def handle_audio(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     lang = user_lang.get(user_id, 'fa')
     
-    # Check subscription
     if not await check_subscription(user_id, context):
         await update.message.reply_text(
             LANG[lang]['not_allowed'],
@@ -208,6 +208,7 @@ async def handle_audio(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     file = None
+    filename = "audio.m4a"
     if update.message.audio:
         file = update.message.audio
         filename = file.file_name or "audio.m4a"
@@ -249,12 +250,11 @@ async def handle_audio(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"Audio processing error: {e}")
         await processing_msg.edit_text(LANG[lang]['conversion_error'])
 
-# ========== YOUTUBE HANDLERS ==========
+# ========== YOUTUBE HANDLERS (FIXED) ==========
 async def handle_youtube(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     lang = user_lang.get(user_id, 'fa')
     
-    # Check subscription
     if not await check_subscription(user_id, context):
         await update.message.reply_text(
             LANG[lang]['not_allowed'],
@@ -266,10 +266,27 @@ async def handle_youtube(update: Update, context: ContextTypes.DEFAULT_TYPE):
     url = update.message.text.strip()
     processing_msg = await update.message.reply_text(LANG[lang]['youtube_processing'])
     
+    # Modern yt-dlp options with extractor_args and proper headers
+    ydl_opts = {
+        'quiet': True,
+        'no_warnings': True,
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['tv', 'web'],  # Use multiple clients for compatibility
+                'skip': ['dash', 'hls'],          # Skip unnecessary formats
+            }
+        },
+        'headers': {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        },
+        'ignoreerrors': True,  # Continue if some formats fail
+    }
+    
     try:
-        ydl_opts = {'quiet': True, 'no_warnings': True}
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
+            if info is None:
+                raise Exception("No info extracted")
             title = info.get('title', 'Video')
             formats = info.get('formats', [])
             
@@ -311,10 +328,22 @@ async def download_youtube_video(query, url, resolution, lang):
             'format': f'bestvideo[height<={height}][ext=mp4]+bestaudio[ext=m4a]/best[height<={height}][ext=mp4]',
             'outtmpl': '%(title)s.%(ext)s',
             'quiet': True,
-            'no_warnings': True
+            'no_warnings': True,
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['tv', 'web'],
+                    'skip': ['dash', 'hls'],
+                }
+            },
+            'headers': {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            },
+            'ignoreerrors': True,
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
+            if info is None:
+                raise Exception("Download failed")
             filepath = ydl.prepare_filename(info)
             with open(filepath, 'rb') as video_file:
                 await query.message.reply_video(
@@ -331,14 +360,30 @@ async def download_youtube_audio(query, url, lang):
     await query.edit_message_text(LANG[lang]['downloading_audio'])
     try:
         ydl_opts = {
-            'format': 'bestaudio/best',
-            'postprocessors': [{'key': 'FFmpegExtractAudio', 'preferredcodec': 'mp3', 'preferredquality': '192'}],
+            'format': 'bestaudio[ext=m4a]/bestaudio/best',
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }],
             'outtmpl': '%(title)s.%(ext)s',
             'quiet': True,
-            'no_warnings': True
+            'no_warnings': True,
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['tv', 'web'],
+                    'skip': ['dash', 'hls'],
+                }
+            },
+            'headers': {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            },
+            'ignoreerrors': True,
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
+            if info is None:
+                raise Exception("Download failed")
             filepath = ydl.prepare_filename(info).replace('.webm', '.mp3')
             with open(filepath, 'rb') as audio_file:
                 await query.message.reply_audio(
@@ -359,10 +404,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     lang = user_lang.get(user_id, 'fa')
     text = update.message.text or ""
     
-    # Check if it's a YouTube link
     if "youtube.com" in text.lower() or "youtu.be" in text.lower():
         await handle_youtube(update, context)
-    # Check if it's an audio file
     elif update.message.audio or update.message.voice or update.message.document:
         await handle_audio(update, context)
     else:
@@ -381,7 +424,7 @@ def main():
     
     print("🤖 Combined Bot is running...")
     print("✅ Audio Converter: Ready")
-    print("✅ YouTube Downloader: Ready")
+    print("✅ YouTube Downloader: Ready (with latest yt-dlp fixes)")
     print("✅ Subscription Check: Enabled")
     print("✅ Language Toggle: Enabled")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
