@@ -4,6 +4,7 @@ import tempfile
 import subprocess
 import json
 import requests
+import uuid
 from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
@@ -12,17 +13,21 @@ from pydub import AudioSegment
 from PIL import Image
 
 # ========== CONFIGURATION ==========
-# 🔴 Replace with your actual bot token
-TOKEN = "8866299232:AAECrRPPu5cfRMxx3J1i4CkICw4F4G861DA"   # Replace with your token
+# 🔴 Replace with your actual bot token (get from @BotFather)
+TOKEN = "8866299232:AAECrRPPu5cfRMxx3J1i4CkICw4F4G861DA"
 
-# Your channels
+# Your channels (replace with your own)
 CHANNELS = [
     {"name": "Pykillinux", "url": "https://t.me/pykillinux"},
     {"name": "Music Search", "url": "https://t.me/music_search"}
 ]
 
-# Admin ID (replace with your Telegram user ID from @userinfobot)
-ADMIN_IDS = [310141017]  # Replace with your actual user ID
+# Admin ID – replace with your Telegram user ID (get from @userinfobot)
+ADMIN_IDS = [310141017]  # Replace with your actual ID
+
+# ========== TEMPORARY STORAGE for FILE IDs ==========
+# Stores file_ids with short reference keys (avoids "Button_data_invalid" error)
+temp_storage = {}
 
 # ========== LANGUAGE DICTIONARY ==========
 LANG = {
@@ -228,30 +233,35 @@ def build_instagram_keyboard(title: str, url: str, lang: str):
     ]
     return InlineKeyboardMarkup(keyboard)
 
+# ===== FIXED: Video conversion keyboard (uses short ref_id) =====
 def build_video_conversion_keyboard(lang: str, file_id: str):
+    ref_id = str(uuid.uuid4())[:8]
+    temp_storage[ref_id] = file_id
     keyboard = [
-        [InlineKeyboardButton("720p", callback_data=f"vidconv_720_{file_id}")],
-        [InlineKeyboardButton("1080p", callback_data=f"vidconv_1080_{file_id}")],
-        [InlineKeyboardButton("480p", callback_data=f"vidconv_480_{file_id}")],
+        [InlineKeyboardButton("720p", callback_data=f"vidconv_720_{ref_id}")],
+        [InlineKeyboardButton("1080p", callback_data=f"vidconv_1080_{ref_id}")],
+        [InlineKeyboardButton("480p", callback_data=f"vidconv_480_{ref_id}")],
         [InlineKeyboardButton(LANG[lang]['cancel'], callback_data="cancel")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
+# ===== FIXED: Image conversion keyboard (uses short ref_id) =====
 def build_image_conversion_keyboard(lang: str, file_id: str, current_format: str):
+    ref_id = str(uuid.uuid4())[:8]
+    temp_storage[ref_id] = file_id
     keyboard = []
     if current_format.lower() in ['jpg', 'jpeg']:
-        keyboard.append([InlineKeyboardButton(LANG[lang]['convert_to_png'], callback_data=f"imgconv_png_{file_id}")])
+        keyboard.append([InlineKeyboardButton(LANG[lang]['convert_to_png'], callback_data=f"imgconv_png_{ref_id}")])
     elif current_format.lower() == 'png':
-        keyboard.append([InlineKeyboardButton(LANG[lang]['convert_to_jpg'], callback_data=f"imgconv_jpg_{file_id}")])
+        keyboard.append([InlineKeyboardButton(LANG[lang]['convert_to_jpg'], callback_data=f"imgconv_jpg_{ref_id}")])
     else:
-        keyboard.append([InlineKeyboardButton(LANG[lang]['convert_to_jpg'], callback_data=f"imgconv_jpg_{file_id}")])
-        keyboard.append([InlineKeyboardButton(LANG[lang]['convert_to_png'], callback_data=f"imgconv_png_{file_id}")])
+        keyboard.append([InlineKeyboardButton(LANG[lang]['convert_to_jpg'], callback_data=f"imgconv_jpg_{ref_id}")])
+        keyboard.append([InlineKeyboardButton(LANG[lang]['convert_to_png'], callback_data=f"imgconv_png_{ref_id}")])
     keyboard.append([InlineKeyboardButton(LANG[lang]['cancel'], callback_data="cancel")])
     return InlineKeyboardMarkup(keyboard)
 
 # ========== CONVERSION FUNCTIONS ==========
 async def convert_video_to_mp4(input_path: str, output_path: str, quality: str):
-    """Convert video to MP4 with specified quality (720p, 1080p, 480p)"""
     try:
         height = int(quality.replace('p', ''))
         cmd = [
@@ -274,7 +284,6 @@ async def convert_video_to_mp4(input_path: str, output_path: str, quality: str):
         return False
 
 async def convert_image(input_path: str, output_path: str, output_format: str):
-    """Convert image to JPG or PNG"""
     try:
         img = Image.open(input_path)
         if output_format.lower() == 'jpg':
@@ -288,7 +297,6 @@ async def convert_image(input_path: str, output_path: str, output_format: str):
         return False
 
 async def download_link_to_file(url: str, output_path: str):
-    """Download a file from a direct link"""
     try:
         response = requests.get(url, stream=True, timeout=30)
         if response.status_code == 200:
@@ -701,7 +709,7 @@ async def download_instagram_audio(query, url, lang):
         logger.error(f"Instagram audio download error: {e}")
         await query.edit_message_text(LANG[lang]['instagram_error'])
 
-# ========== VIDEO CONVERSION HANDLERS ==========
+# ========== VIDEO CONVERSION HANDLERS (FIXED) ==========
 async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     track_user(user.id, user.username, user.first_name, user.last_name, 'video_conversion')
@@ -743,7 +751,12 @@ async def video_conversion_callback(update: Update, context: ContextTypes.DEFAUL
     parts = data.split('_')
     if parts[0] == "vidconv":
         quality = parts[1]
-        file_id = parts[2]
+        ref_id = parts[2]
+        file_id = temp_storage.get(ref_id)
+        if not file_id:
+            await query.edit_message_text("❌ File not found. Please try again.")
+            return
+        
         await query.edit_message_text(LANG[lang]['converting_video'])
         
         try:
@@ -768,11 +781,13 @@ async def video_conversion_callback(update: Update, context: ContextTypes.DEFAUL
             os.unlink(input_path)
             if os.path.exists(output_path):
                 os.unlink(output_path)
+            # Clean up temp storage
+            temp_storage.pop(ref_id, None)
         except Exception as e:
             logger.error(f"Video conversion callback error: {e}")
             await query.edit_message_text(LANG[lang]['conversion_error'])
 
-# ========== IMAGE CONVERSION HANDLERS ==========
+# ========== IMAGE CONVERSION HANDLERS (FIXED) ==========
 async def handle_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     track_user(user.id, user.username, user.first_name, user.last_name, 'image_conversion')
@@ -820,7 +835,12 @@ async def image_conversion_callback(update: Update, context: ContextTypes.DEFAUL
     parts = data.split('_')
     if parts[0] == "imgconv":
         output_format = parts[1]
-        file_id = parts[2]
+        ref_id = parts[2]
+        file_id = temp_storage.get(ref_id)
+        if not file_id:
+            await query.edit_message_text("❌ File not found. Please try again.")
+            return
+        
         await query.edit_message_text(LANG[lang]['converting_image'])
         
         try:
@@ -845,6 +865,8 @@ async def image_conversion_callback(update: Update, context: ContextTypes.DEFAUL
             os.unlink(input_path)
             if os.path.exists(output_path):
                 os.unlink(output_path)
+            # Clean up temp storage
+            temp_storage.pop(ref_id, None)
         except Exception as e:
             logger.error(f"Image conversion callback error: {e}")
             await query.edit_message_text(LANG[lang]['conversion_error'])
@@ -963,11 +985,9 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     app = Application.builder().token(TOKEN).build()
     
-    # Command handlers
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("stats", stats))
     
-    # Callback handlers
     app.add_handler(CallbackQueryHandler(check_subscription_callback, pattern="check_subscription"))
     app.add_handler(CallbackQueryHandler(toggle_language, pattern="toggle_lang"))
     app.add_handler(CallbackQueryHandler(youtube_callback, pattern="video_"))
@@ -977,7 +997,6 @@ def main():
     app.add_handler(CallbackQueryHandler(image_conversion_callback, pattern="imgconv_"))
     app.add_handler(CallbackQueryHandler(youtube_callback, pattern="cancel"))
     
-    # Message handler
     app.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, handle_message))
     
     print("🤖 Combined Bot is running...")
