@@ -9,7 +9,7 @@ from pydub import AudioSegment
 
 # ========== CONFIGURATION ==========
 # 🔴 Replace with your NEW bot token
-TOKEN = "8866299232:AAH6IUtnTZYw9e8y7daPicXFd-aiMC_JWK0"
+TOKEN = os.getenv('8866299232:AAF_Dsvc4-RfYtecbBadN3I6cd1ZRtGjUXE')
 
 # Your channels
 CHANNELS = [
