@@ -14,7 +14,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQu
 import yt_dlp
 from pydub import AudioSegment
 from PIL import Image
-import fitz  # PyMuPDF
+import fitz
 from docx import Document
 from pptx import Presentation
 from openpyxl import load_workbook
@@ -28,33 +28,28 @@ try:
 except ImportError:
     decode = None
     QR_AVAILABLE = False
-    print("⚠️ QR code reading disabled: pyzbar library not available (libzbar missing)")
+    print("⚠️ QR code reading disabled: pyzbar not available")
 
 # ========== CONFIGURATION ==========
-TOKEN = "8866299232:AAECrRPPu5cfRMxx3J1i4CkICw4F4G861DA"  # Replace with your token
+TOKEN = "8866299232:AAECrRPPu5cfRMxx3J1i4CkICw4F4G861DA"      # ← replace with your token
+ADMIN_IDS = [310141017]            # ← replace with your user ID
 
 CHANNELS = [
     {"name": "Pykillinux", "url": "https://t.me/pykillinux"},
     {"name": "Music Search", "url": "https://t.me/music_search"}
 ]
 
-ADMIN_IDS = [310141017]  # Replace with your user ID
-
-# ========== TEMPORARY STORAGE ==========
 temp_storage = {}
 user_sessions = {}
 
 # ========== LANGUAGE DICTIONARY ==========
 LANG = {
     'fa': {
-        'welcome': "🎯 **ربات چندمنظوره**\n\n"
-                   "برای استفاده از این ربات، لطفاً ابتدا در کانال‌های زیر عضو شوید:\n\n",
+        'welcome': "🎯 **ربات چندمنظوره**\n\nبرای استفاده از این ربات، لطفاً ابتدا در کانال‌های زیر عضو شوید:\n\n",
         'join_channels': "• {name}\n",
         'check_btn': "✅ بررسی عضویت",
-        'subscribed': "✅ **تبریک! شما در تمام کانال‌ها عضو هستید.**\n\n"
-                      "🎯 از منوی زیر یکی از گزینه‌ها را انتخاب کنید:",
-        'not_subscribed': "❌ **شما هنوز در تمام کانال‌ها عضو نشده‌اید.**\n\n"
-                          "لطفاً روی لینک کانال‌های زیر کلیک کرده و عضو شوید، سپس دوباره روی دکمه **بررسی عضویت** کلیک کنید.",
+        'subscribed': "✅ **تبریک! شما در تمام کانال‌ها عضو هستید.**\n\n🎯 از منوی زیر یکی از گزینه‌ها را انتخاب کنید:",
+        'not_subscribed': "❌ **شما هنوز در تمام کانال‌ها عضو نشده‌اید.**\n\nلطفاً روی لینک کانال‌های زیر کلیک کرده و عضو شوید، سپس دوباره روی دکمه **بررسی عضویت** کلیک کنید.",
         'not_allowed': "❌ **دسترسی محدود شده است.**\n\nلطفاً ابتدا در کانال‌های زیر عضو شوید:",
         'help': "برای راهنمایی بیشتر از /start استفاده کنید.",
         'main_menu': "🎯 **منوی اصلی**\n\nلطفاً یکی از گزینه‌های زیر را انتخاب کنید:",
@@ -108,14 +103,11 @@ LANG = {
         'max_files': "❌ حداکثر ۵ فایل مجاز است.",
     },
     'en': {
-        'welcome': "🎯 **Multipurpose Bot**\n\n"
-                   "To use this bot, please join the following channels first:\n\n",
+        'welcome': "🎯 **Multipurpose Bot**\n\nTo use this bot, please join the following channels first:\n\n",
         'join_channels': "• {name}\n",
         'check_btn': "✅ Check Subscription",
-        'subscribed': "✅ **Congratulations! You are subscribed to all channels.**\n\n"
-                      "🎯 Select an option from the menu below:",
-        'not_subscribed': "❌ **You haven't joined all channels yet.**\n\n"
-                          "Please click the channel links below and join, then click the **Check Subscription** button again.",
+        'subscribed': "✅ **Congratulations! You are subscribed to all channels.**\n\n🎯 Select an option from the menu below:",
+        'not_subscribed': "❌ **You haven't joined all channels yet.**\n\nPlease click the channel links below and join, then click the **Check Subscription** button again.",
         'not_allowed': "❌ **Access restricted.**\n\nPlease join the channels below first:",
         'help': "Use /start for more information.",
         'main_menu': "🎯 **Main Menu**\n\nPlease select one of the options below:",
@@ -263,8 +255,7 @@ def build_main_menu(lang: str):
     return InlineKeyboardMarkup(keyboard)
 
 def build_back_button(lang: str):
-    keyboard = [[InlineKeyboardButton(LANG[lang]['back'], callback_data="main_menu")]]
-    return InlineKeyboardMarkup(keyboard)
+    return InlineKeyboardMarkup([[InlineKeyboardButton(LANG[lang]['back'], callback_data="main_menu")]])
 
 def build_unit_converter_keyboard(lang: str):
     keyboard = [
@@ -469,27 +460,11 @@ def extract_audio_from_video(input_path, output_path):
 
 def unit_converter(value, from_unit, to_unit, category):
     conversions = {
-        'length': {
-            'meter': 1, 'kilometer': 1000, 'centimeter': 0.01,
-            'millimeter': 0.001, 'mile': 1609.34, 'yard': 0.9144,
-            'foot': 0.3048, 'inch': 0.0254
-        },
-        'weight': {
-            'kilogram': 1, 'gram': 0.001, 'milligram': 0.000001,
-            'pound': 0.453592, 'ounce': 0.0283495, 'ton': 1000
-        },
-        'temperature': {
-            'celsius': 'c', 'fahrenheit': 'f', 'kelvin': 'k'
-        },
-        'area': {
-            'square_meter': 1, 'square_kilometer': 1000000,
-            'square_mile': 2589988, 'acre': 4046.86,
-            'hectare': 10000, 'square_foot': 0.092903
-        },
-        'volume': {
-            'liter': 1, 'milliliter': 0.001, 'gallon': 3.78541,
-            'quart': 0.946353, 'pint': 0.473176, 'cup': 0.236588
-        }
+        'length': {'meter':1, 'kilometer':1000, 'centimeter':0.01, 'millimeter':0.001, 'mile':1609.34, 'yard':0.9144, 'foot':0.3048, 'inch':0.0254},
+        'weight': {'kilogram':1, 'gram':0.001, 'milligram':0.000001, 'pound':0.453592, 'ounce':0.0283495, 'ton':1000},
+        'temperature': {'celsius':'c', 'fahrenheit':'f', 'kelvin':'k'},
+        'area': {'square_meter':1, 'square_kilometer':1000000, 'square_mile':2589988, 'acre':4046.86, 'hectare':10000, 'square_foot':0.092903},
+        'volume': {'liter':1, 'milliliter':0.001, 'gallon':3.78541, 'quart':0.946353, 'pint':0.473176, 'cup':0.236588}
     }
     try:
         if category == 'temperature':
@@ -524,17 +499,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_id not in user_lang:
         user_lang[user_id] = 'fa'
     lang = user_lang[user_id]
-    
     message = LANG[lang]['welcome']
     for channel in CHANNELS:
         message += LANG[lang]['join_channels'].format(name=channel['name'])
     message += "\n" + LANG[lang]['help']
-    
-    await update.message.reply_text(
-        message,
-        reply_markup=build_channel_keyboard(lang),
-        parse_mode="Markdown"
-    )
+    await update.message.reply_text(message, reply_markup=build_channel_keyboard(lang), parse_mode="Markdown")
 
 async def check_subscription_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -544,20 +513,11 @@ async def check_subscription_callback(update: Update, context: ContextTypes.DEFA
         return
     user_id = user.id
     lang = user_lang.get(user_id, 'fa')
-    
     if await check_subscription(user_id, context):
         user_subscribed[user_id] = True
-        await query.edit_message_text(
-            LANG[lang]['subscribed'],
-            reply_markup=build_main_menu(lang),
-            parse_mode="Markdown"
-        )
+        await query.edit_message_text(LANG[lang]['subscribed'], reply_markup=build_main_menu(lang), parse_mode="Markdown")
     else:
-        await query.edit_message_text(
-            LANG[lang]['not_subscribed'],
-            reply_markup=build_channel_keyboard(lang),
-            parse_mode="Markdown"
-        )
+        await query.edit_message_text(LANG[lang]['not_subscribed'], reply_markup=build_channel_keyboard(lang), parse_mode="Markdown")
 
 async def toggle_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -569,23 +529,14 @@ async def toggle_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
     current = user_lang.get(user_id, 'fa')
     new_lang = 'en' if current == 'fa' else 'fa'
     user_lang[user_id] = new_lang
-    
     if await check_subscription(user_id, context):
-        await query.edit_message_text(
-            LANG[new_lang]['subscribed'],
-            reply_markup=build_main_menu(new_lang),
-            parse_mode="Markdown"
-        )
+        await query.edit_message_text(LANG[new_lang]['subscribed'], reply_markup=build_main_menu(new_lang), parse_mode="Markdown")
     else:
         message = LANG[new_lang]['welcome']
         for channel in CHANNELS:
             message += LANG[new_lang]['join_channels'].format(name=channel['name'])
         message += "\n" + LANG[new_lang]['help']
-        await query.edit_message_text(
-            message,
-            reply_markup=build_channel_keyboard(new_lang),
-            parse_mode="Markdown"
-        )
+        await query.edit_message_text(message, reply_markup=build_channel_keyboard(new_lang), parse_mode="Markdown")
 
 # ========== MENU NAVIGATION ==========
 async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -596,16 +547,11 @@ async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     user_id = user.id
     lang = user_lang.get(user_id, 'fa')
-    
     if user_id in user_sessions:
         del user_sessions[user_id]
-    
-    await query.edit_message_text(
-        LANG[lang]['main_menu'],
-        reply_markup=build_main_menu(lang),
-        parse_mode="Markdown"
-    )
+    await query.edit_message_text(LANG[lang]['main_menu'], reply_markup=build_main_menu(lang), parse_mode="Markdown")
 
+# ---------- FIXED menu_handler (no KeyError) ----------
 async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -615,15 +561,10 @@ async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = user.id
     data = query.data
     lang = user_lang.get(user_id, 'fa')
-    
     if not await check_subscription(user_id, context):
-        await query.edit_message_text(
-            LANG[lang]['not_allowed'],
-            reply_markup=build_channel_keyboard(lang),
-            parse_mode="Markdown"
-        )
+        await query.edit_message_text(LANG[lang]['not_allowed'], reply_markup=build_channel_keyboard(lang), parse_mode="Markdown")
         return
-    
+
     menu_actions = {
         'menu_video_convert': ('🎬', 'send_video', 'video_conversion', build_back_button),
         'menu_audio_convert': ('🎵', 'send_audio', 'audio_conversion', build_back_button),
@@ -642,41 +583,29 @@ async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         'menu_link_download': ('🔗', 'send_link', 'link_download', build_back_button),
         'menu_unit_convert': ('📏', '', 'unit_convert', build_unit_converter_keyboard),
     }
-    
+
     if data in menu_actions:
         icon, prompt, session_type, keyboard_func = menu_actions[data]
         user_sessions[user_id] = {'state': session_type, 'files': []}
-        
         if data == 'menu_unit_convert':
             await query.edit_message_text(
-                f"{icon} **{LANG[lang]['menu_unit_convert']}**\n\n"
-                "📏 Select conversion type:",
-                reply_markup=keyboard_func(lang),
-                parse_mode="Markdown"
-            )
+                f"{icon} **{LANG[lang]['menu_unit_convert']}**\n\n📏 Select conversion type:",
+                reply_markup=keyboard_func(lang), parse_mode="Markdown")
         elif data == 'menu_image_to_pdf':
             await query.edit_message_text(
-                f"{icon} **{LANG[lang]['menu_image_to_pdf']}**\n\n"
-                f"{LANG[lang]['send_images']}",
-                reply_markup=keyboard_func(lang),
-                parse_mode="Markdown"
-            )
+                f"{icon} **{LANG[lang]['menu_image_to_pdf']}**\n\n{LANG[lang]['send_images']}",
+                reply_markup=keyboard_func(lang), parse_mode="Markdown")
         elif data == 'menu_zip':
             await query.edit_message_text(
-                f"{icon} **{LANG[lang]['menu_zip']}**\n\n"
-                f"{LANG[lang]['send_zip_files']}",
-                reply_markup=keyboard_func(lang),
-                parse_mode="Markdown"
-            )
+                f"{icon} **{LANG[lang]['menu_zip']}**\n\n{LANG[lang]['send_zip_files']}",
+                reply_markup=keyboard_func(lang), parse_mode="Markdown")
         else:
+            # ***** FIX: use the menu key itself as the language key *****
             await query.edit_message_text(
-                f"{icon} **{LANG[lang][menu_actions[data][0]]}**\n\n"
-                f"{LANG[lang][prompt]}",
-                reply_markup=keyboard_func(lang),
-                parse_mode="Markdown"
-            )
+                f"{icon} **{LANG[lang][data]}**\n\n{LANG[lang][prompt]}",
+                reply_markup=keyboard_func(lang), parse_mode="Markdown")
 
-# ========== UNIT CONVERTER ==========
+# ========== UNIT CONVERTER CALLBACK ==========
 async def unit_convert_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -686,30 +615,23 @@ async def unit_convert_callback(update: Update, context: ContextTypes.DEFAULT_TY
         return
     user_id = user.id
     lang = user_lang.get(user_id, 'fa')
-    
     if data == "main_menu":
         await main_menu(update, context)
         return
-    
     if user_id not in user_sessions:
         user_sessions[user_id] = {}
     user_sessions[user_id]['unit_category'] = data.replace('unit_', '')
     user_sessions[user_id]['state'] = 'unit_value'
-    
     await query.edit_message_text(
-        "📏 **Unit Converter**\n\n"
-        "Please enter the value and units in this format:\n"
-        "`10 meter to kilometer`\n"
-        "`25 celsius to fahrenheit`\n\n"
+        "📏 **Unit Converter**\n\nPlease enter the value and units in this format:\n"
+        "`10 meter to kilometer`\n`25 celsius to fahrenheit`\n\n"
         "Available units:\n"
         "Length: meter, kilometer, centimeter, millimeter, mile, yard, foot, inch\n"
         "Weight: kilogram, gram, milligram, pound, ounce, ton\n"
         "Temperature: celsius, fahrenheit, kelvin\n"
         "Area: square_meter, square_kilometer, square_mile, acre, hectare, square_foot\n"
         "Volume: liter, milliliter, gallon, quart, pint, cup",
-        reply_markup=build_back_button(lang),
-        parse_mode="Markdown"
-    )
+        reply_markup=build_back_button(lang), parse_mode="Markdown")
 
 # ========== FILE HANDLING ==========
 async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -718,18 +640,11 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     user_id = user.id
     lang = user_lang.get(user_id, 'fa')
-    
     if not await check_subscription(user_id, context):
-        await update.message.reply_text(
-            LANG[lang]['not_allowed'],
-            reply_markup=build_channel_keyboard(lang),
-            parse_mode="Markdown"
-        )
+        await update.message.reply_text(LANG[lang]['not_allowed'], reply_markup=build_channel_keyboard(lang), parse_mode="Markdown")
         return
-    
     session = user_sessions.get(user_id, {})
     state = session.get('state', '')
-    
     if state == 'video_conversion':
         await handle_video_conversion(update, context)
     elif state == 'audio_conversion':
@@ -763,71 +678,49 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif state == 'instagram_download':
         await handle_instagram(update, context)
     else:
-        await update.message.reply_text(
-            "🔙 Please select an option from the menu first.",
-            reply_markup=build_main_menu(lang)
-        )
+        await update.message.reply_text("🔙 Please select an option from the menu first.", reply_markup=build_main_menu(lang))
 
 # ========== FEATURE HANDLERS ==========
 async def handle_video_conversion(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if not user:
         return
-    user_id = user.id
-    lang = user_lang.get(user_id, 'fa')
-    
+    lang = user_lang.get(user.id, 'fa')
     video = update.message.video
     if not video:
         await update.message.reply_text("⚠️ " + LANG[lang]['send_video'])
         return
-    
-    file_id = video.file_id
     ref_id = str(uuid.uuid4())[:8]
-    temp_storage[ref_id] = file_id
-    
+    temp_storage[ref_id] = video.file_id
     keyboard = [
         [InlineKeyboardButton("720p", callback_data=f"vidconv_720_{ref_id}")],
         [InlineKeyboardButton("1080p", callback_data=f"vidconv_1080_{ref_id}")],
         [InlineKeyboardButton("480p", callback_data=f"vidconv_480_{ref_id}")],
         [InlineKeyboardButton(LANG[lang]['back'], callback_data="main_menu")]
     ]
-    await update.message.reply_text(
-        LANG[lang]['video_conversion'],
-        reply_markup=InlineKeyboardMarkup(keyboard),
-        parse_mode="Markdown"
-    )
+    await update.message.reply_text(LANG[lang]['video_conversion'], reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
 
 async def handle_audio_conversion(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if not user:
         return
-    user_id = user.id
-    lang = user_lang.get(user_id, 'fa')
-    
+    lang = user_lang.get(user.id, 'fa')
     file = update.message.audio or update.message.voice
     if not file:
         await update.message.reply_text("⚠️ " + LANG[lang]['send_audio'])
         return
-    
     processing_msg = await update.message.reply_text(LANG[lang]['processing'])
     try:
         file_obj = await context.bot.get_file(file.file_id)
-        with tempfile.NamedTemporaryFile(delete=False) as input_file:
-            input_path = input_file.name
+        with tempfile.NamedTemporaryFile(delete=False) as f:
+            input_path = f.name
             await file_obj.download_to_drive(input_path)
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as output_file:
-            output_path = output_file.name
-        
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as f:
+            output_path = f.name
         audio = AudioSegment.from_file(input_path)
         audio.export(output_path, format="mp3", bitrate="192k")
-        
-        with open(output_path, 'rb') as mp3_file:
-            await update.message.reply_audio(
-                audio=mp3_file,
-                filename="converted.mp3",
-                performer="Bot",
-                title="Converted Audio"
-            )
+        with open(output_path, 'rb') as mp3:
+            await update.message.reply_audio(audio=mp3, filename="converted.mp3", performer="Bot", title="Converted Audio")
         await processing_msg.delete()
         os.unlink(input_path)
         os.unlink(output_path)
@@ -839,9 +732,7 @@ async def handle_image_conversion(update: Update, context: ContextTypes.DEFAULT_
     user = update.effective_user
     if not user:
         return
-    user_id = user.id
-    lang = user_lang.get(user_id, 'fa')
-    
+    lang = user_lang.get(user.id, 'fa')
     if update.message.photo:
         file_id = update.message.photo[-1].file_id
         current_format = 'jpg'
@@ -852,10 +743,8 @@ async def handle_image_conversion(update: Update, context: ContextTypes.DEFAULT_
             return
         file_id = doc.file_id
         current_format = doc.mime_type.split('/')[-1]
-    
     ref_id = str(uuid.uuid4())[:8]
     temp_storage[ref_id] = file_id
-    
     keyboard = []
     if current_format.lower() in ['jpg', 'jpeg']:
         keyboard.append([InlineKeyboardButton("PNG", callback_data=f"imgconv_png_{ref_id}")])
@@ -865,12 +754,7 @@ async def handle_image_conversion(update: Update, context: ContextTypes.DEFAULT_
         keyboard.append([InlineKeyboardButton("JPG", callback_data=f"imgconv_jpg_{ref_id}")])
         keyboard.append([InlineKeyboardButton("PNG", callback_data=f"imgconv_png_{ref_id}")])
     keyboard.append([InlineKeyboardButton(LANG[lang]['back'], callback_data="main_menu")])
-    
-    await update.message.reply_text(
-        LANG[lang]['image_conversion'],
-        reply_markup=InlineKeyboardMarkup(keyboard),
-        parse_mode="Markdown"
-    )
+    await update.message.reply_text(LANG[lang]['image_conversion'], reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
 
 async def handle_image_to_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -878,12 +762,9 @@ async def handle_image_to_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE
         return
     user_id = user.id
     lang = user_lang.get(user_id, 'fa')
-    
     if user_id not in user_sessions:
         user_sessions[user_id] = {'state': 'image_to_pdf', 'files': []}
-    
     session = user_sessions[user_id]
-    
     if update.message.photo:
         file_id = update.message.photo[-1].file_id
         session['files'].append(file_id)
@@ -897,7 +778,6 @@ async def handle_image_to_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE
     else:
         await update.message.reply_text("⚠️ " + LANG[lang]['send_image'])
         return
-    
     if len(session['files']) >= 5:
         await create_pdf_from_images(update, context)
     else:
@@ -905,10 +785,7 @@ async def handle_image_to_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE
             [InlineKeyboardButton("📄 Create PDF", callback_data="create_pdf")],
             [InlineKeyboardButton(LANG[lang]['back'], callback_data="main_menu")]
         ]
-        await update.message.reply_text(
-            f"✅ Image added! ({len(session['files'])}/5)\n\n{LANG[lang]['send_images']}",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
+        await update.message.reply_text(f"✅ Image added! ({len(session['files'])}/5)\n\n{LANG[lang]['send_images']}", reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def create_pdf_from_images(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -918,16 +795,12 @@ async def create_pdf_from_images(update: Update, context: ContextTypes.DEFAULT_T
         return
     user_id = user.id
     lang = user_lang.get(user_id, 'fa')
-    
     session = user_sessions.get(user_id, {})
     files = session.get('files', [])
-    
     if not files:
         await query.edit_message_text("❌ No images found.")
         return
-    
     await query.edit_message_text(LANG[lang]['processing'])
-    
     try:
         image_paths = []
         for file_id in files:
@@ -936,31 +809,21 @@ async def create_pdf_from_images(update: Update, context: ContextTypes.DEFAULT_T
                 path = tmp.name
                 await file.download_to_drive(path)
                 image_paths.append(path)
-        
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
             output_path = tmp.name
-        
         success = images_to_pdf(image_paths, output_path)
-        
         if success:
-            with open(output_path, 'rb') as pdf_file:
-                await query.message.reply_document(
-                    document=pdf_file,
-                    filename="images.pdf",
-                    caption=LANG[lang]['pdf_created']
-                )
+            with open(output_path, 'rb') as f:
+                await query.message.reply_document(document=f, filename="images.pdf", caption=LANG[lang]['pdf_created'])
             await query.edit_message_text(LANG[lang]['download_complete'])
         else:
             await query.edit_message_text(LANG[lang]['error'])
-        
         for path in image_paths:
             if os.path.exists(path):
                 os.unlink(path)
         if os.path.exists(output_path):
             os.unlink(output_path)
-        
         user_sessions[user_id] = {'state': None, 'files': []}
-        
     except Exception as e:
         logger.error(f"PDF creation error: {e}")
         await query.edit_message_text(LANG[lang]['error'])
@@ -969,24 +832,19 @@ async def handle_pdf_to_image(update: Update, context: ContextTypes.DEFAULT_TYPE
     user = update.effective_user
     if not user:
         return
-    user_id = user.id
-    lang = user_lang.get(user_id, 'fa')
-    
+    lang = user_lang.get(user.id, 'fa')
     doc = update.message.document
     if not doc or not doc.mime_type or doc.mime_type != 'application/pdf':
         await update.message.reply_text("⚠️ " + LANG[lang]['send_pdf'])
         return
-    
     processing_msg = await update.message.reply_text(LANG[lang]['processing'])
     try:
         file_obj = await context.bot.get_file(doc.file_id)
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as pdf_file:
-            pdf_path = pdf_file.name
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as f:
+            pdf_path = f.name
             await file_obj.download_to_drive(pdf_path)
-        
         output_dir = tempfile.mkdtemp()
         image_paths = pdf_to_images(pdf_path, output_dir)
-        
         if image_paths:
             for img_path in image_paths:
                 with open(img_path, 'rb') as img:
@@ -995,7 +853,6 @@ async def handle_pdf_to_image(update: Update, context: ContextTypes.DEFAULT_TYPE
             shutil.rmtree(output_dir)
         else:
             await processing_msg.edit_text(LANG[lang]['error'])
-        
         os.unlink(pdf_path)
     except Exception as e:
         logger.error(f"PDF to image error: {e}")
@@ -1005,26 +862,19 @@ async def handle_qr_generate(update: Update, context: ContextTypes.DEFAULT_TYPE)
     user = update.effective_user
     if not user:
         return
-    user_id = user.id
-    lang = user_lang.get(user_id, 'fa')
-    
+    lang = user_lang.get(user.id, 'fa')
     text = update.message.text
     if not text:
         await update.message.reply_text("⚠️ " + LANG[lang]['send_qr_text'])
         return
-    
     processing_msg = await update.message.reply_text(LANG[lang]['processing'])
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
             output_path = tmp.name
-        
         success = generate_qr_code(text, output_path)
         if success:
             with open(output_path, 'rb') as qr_file:
-                await update.message.reply_photo(
-                    photo=qr_file,
-                    caption=LANG[lang]['qr_created']
-                )
+                await update.message.reply_photo(photo=qr_file, caption=LANG[lang]['qr_created'])
             await processing_msg.delete()
         else:
             await processing_msg.edit_text(LANG[lang]['error'])
@@ -1035,18 +885,12 @@ async def handle_qr_generate(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def handle_qr_read(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not QR_AVAILABLE:
-        await update.message.reply_text(
-            "❌ QR Code reading is currently disabled because the system library (libzbar) is missing.\n"
-            "Please contact the bot administrator."
-        )
+        await update.message.reply_text("❌ QR Code reading is disabled (libzbar missing).")
         return
-    
     user = update.effective_user
     if not user:
         return
-    user_id = user.id
-    lang = user_lang.get(user_id, 'fa')
-    
+    lang = user_lang.get(user.id, 'fa')
     if update.message.photo:
         file_id = update.message.photo[-1].file_id
     elif update.message.document:
@@ -1059,19 +903,15 @@ async def handle_qr_read(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("⚠️ " + LANG[lang]['send_qr_image'])
         return
-    
     processing_msg = await update.message.reply_text(LANG[lang]['processing'])
     try:
         file_obj = await context.bot.get_file(file_id)
         with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
             image_path = tmp.name
             await file_obj.download_to_drive(image_path)
-        
         result = read_qr_code(image_path)
         if result:
-            await update.message.reply_text(
-                LANG[lang]['qr_read_result'].format(text=result)
-            )
+            await update.message.reply_text(LANG[lang]['qr_read_result'].format(text=result))
         else:
             await update.message.reply_text("❌ No QR Code found in image.")
         await processing_msg.delete()
@@ -1086,19 +926,15 @@ async def handle_zip_compress(update: Update, context: ContextTypes.DEFAULT_TYPE
         return
     user_id = user.id
     lang = user_lang.get(user_id, 'fa')
-    
     if user_id not in user_sessions:
         user_sessions[user_id] = {'state': 'zip_compress', 'files': []}
-    
     session = user_sessions[user_id]
-    
     doc = update.message.document
     if doc:
         session['files'].append(doc.file_id)
     else:
         await update.message.reply_text("⚠️ " + LANG[lang]['send_zip_files'])
         return
-    
     if len(session['files']) >= 5:
         await create_zip_from_files(update, context)
     else:
@@ -1106,10 +942,7 @@ async def handle_zip_compress(update: Update, context: ContextTypes.DEFAULT_TYPE
             [InlineKeyboardButton("📦 Compress", callback_data="create_zip")],
             [InlineKeyboardButton(LANG[lang]['back'], callback_data="main_menu")]
         ]
-        await update.message.reply_text(
-            f"✅ File added! ({len(session['files'])}/5)\n\n{LANG[lang]['send_zip_files']}",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
+        await update.message.reply_text(f"✅ File added! ({len(session['files'])}/5)\n\n{LANG[lang]['send_zip_files']}", reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def create_zip_from_files(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -1119,16 +952,12 @@ async def create_zip_from_files(update: Update, context: ContextTypes.DEFAULT_TY
         return
     user_id = user.id
     lang = user_lang.get(user_id, 'fa')
-    
     session = user_sessions.get(user_id, {})
     files = session.get('files', [])
-    
     if not files:
         await query.edit_message_text("❌ No files found.")
         return
-    
     await query.edit_message_text(LANG[lang]['processing'])
-    
     try:
         file_paths = []
         for file_id in files:
@@ -1137,31 +966,21 @@ async def create_zip_from_files(update: Update, context: ContextTypes.DEFAULT_TY
                 path = tmp.name
                 await file.download_to_drive(path)
                 file_paths.append(path)
-        
         with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as tmp:
             output_path = tmp.name
-        
         success = create_zip(file_paths, output_path)
-        
         if success:
-            with open(output_path, 'rb') as zip_file:
-                await query.message.reply_document(
-                    document=zip_file,
-                    filename="archive.zip",
-                    caption=LANG[lang]['zip_created']
-                )
+            with open(output_path, 'rb') as f:
+                await query.message.reply_document(document=f, filename="archive.zip", caption=LANG[lang]['zip_created'])
             await query.edit_message_text(LANG[lang]['download_complete'])
         else:
             await query.edit_message_text(LANG[lang]['error'])
-        
         for path in file_paths:
             if os.path.exists(path):
                 os.unlink(path)
         if os.path.exists(output_path):
             os.unlink(output_path)
-        
         user_sessions[user_id] = {'state': None, 'files': []}
-        
     except Exception as e:
         logger.error(f"ZIP create error: {e}")
         await query.edit_message_text(LANG[lang]['error'])
@@ -1170,38 +989,29 @@ async def handle_zip_extract(update: Update, context: ContextTypes.DEFAULT_TYPE)
     user = update.effective_user
     if not user:
         return
-    user_id = user.id
-    lang = user_lang.get(user_id, 'fa')
-    
+    lang = user_lang.get(user.id, 'fa')
     doc = update.message.document
     if not doc or not doc.mime_type or doc.mime_type != 'application/zip':
         await update.message.reply_text("⚠️ " + LANG[lang]['send_unzip'])
         return
-    
     processing_msg = await update.message.reply_text(LANG[lang]['processing'])
     try:
         file_obj = await context.bot.get_file(doc.file_id)
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as zip_file:
-            zip_path = zip_file.name
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as f:
+            zip_path = f.name
             await file_obj.download_to_drive(zip_path)
-        
         output_dir = tempfile.mkdtemp()
         success = extract_zip(zip_path, output_dir)
-        
         if success:
             for filename in os.listdir(output_dir):
                 file_path = os.path.join(output_dir, filename)
                 if os.path.isfile(file_path):
                     with open(file_path, 'rb') as f:
-                        await update.message.reply_document(
-                            document=f,
-                            filename=filename
-                        )
+                        await update.message.reply_document(document=f, filename=filename)
             await processing_msg.delete()
             shutil.rmtree(output_dir)
         else:
             await processing_msg.edit_text(LANG[lang]['error'])
-        
         os.unlink(zip_path)
     except Exception as e:
         logger.error(f"ZIP extract error: {e}")
@@ -1211,42 +1021,30 @@ async def handle_doc_to_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if not user:
         return
-    user_id = user.id
-    lang = user_lang.get(user_id, 'fa')
-    
+    lang = user_lang.get(user.id, 'fa')
     doc = update.message.document
     if not doc:
         await update.message.reply_text("⚠️ " + LANG[lang]['send_document'])
         return
-    
     ext = os.path.splitext(doc.file_name)[1].lower()
     if ext not in ['.docx', '.pptx', '.xlsx', '.xls']:
         await update.message.reply_text("⚠️ Please send a Word (.docx), PowerPoint (.pptx), or Excel (.xlsx) file.")
         return
-    
     processing_msg = await update.message.reply_text(LANG[lang]['processing'])
     try:
         file_obj = await context.bot.get_file(doc.file_id)
-        with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as input_file:
-            input_path = input_file.name
+        with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as f:
+            input_path = f.name
             await file_obj.download_to_drive(input_path)
-        
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as output_file:
-            output_path = output_file.name
-        
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as f:
+            output_path = f.name
         success = doc_to_pdf(input_path, output_path)
-        
         if success:
             with open(output_path, 'rb') as pdf_file:
-                await update.message.reply_document(
-                    document=pdf_file,
-                    filename=os.path.splitext(doc.file_name)[0] + ".pdf",
-                    caption="📄 PDF created from document"
-                )
+                await update.message.reply_document(document=pdf_file, filename=os.path.splitext(doc.file_name)[0] + ".pdf", caption="📄 PDF created from document")
             await processing_msg.delete()
         else:
             await processing_msg.edit_text(LANG[lang]['error'])
-        
         os.unlink(input_path)
         if os.path.exists(output_path):
             os.unlink(output_path)
@@ -1258,32 +1056,22 @@ async def handle_text_to_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE)
     user = update.effective_user
     if not user:
         return
-    user_id = user.id
-    lang = user_lang.get(user_id, 'fa')
-    
+    lang = user_lang.get(user.id, 'fa')
     text = update.message.text
     if not text:
         await update.message.reply_text("⚠️ " + LANG[lang]['send_text'])
         return
-    
     processing_msg = await update.message.reply_text(LANG[lang]['processing'])
     try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as output_file:
-            output_path = output_file.name
-        
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as f:
+            output_path = f.name
         success = text_to_pdf(text, output_path)
-        
         if success:
-            with open(output_path, 'rb') as pdf_file:
-                await update.message.reply_document(
-                    document=pdf_file,
-                    filename="text.pdf",
-                    caption=LANG[lang]['pdf_created']
-                )
+            with open(output_path, 'rb') as f:
+                await update.message.reply_document(document=f, filename="text.pdf", caption=LANG[lang]['pdf_created'])
             await processing_msg.delete()
         else:
             await processing_msg.edit_text(LANG[lang]['error'])
-        
         if os.path.exists(output_path):
             os.unlink(output_path)
     except Exception as e:
@@ -1294,38 +1082,26 @@ async def handle_audio_extract(update: Update, context: ContextTypes.DEFAULT_TYP
     user = update.effective_user
     if not user:
         return
-    user_id = user.id
-    lang = user_lang.get(user_id, 'fa')
-    
+    lang = user_lang.get(user.id, 'fa')
     video = update.message.video
     if not video:
         await update.message.reply_text("⚠️ " + LANG[lang]['send_video'])
         return
-    
     processing_msg = await update.message.reply_text(LANG[lang]['processing'])
     try:
         file_obj = await context.bot.get_file(video.file_id)
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as input_file:
-            input_path = input_file.name
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as f:
+            input_path = f.name
             await file_obj.download_to_drive(input_path)
-        
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as output_file:
-            output_path = output_file.name
-        
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as f:
+            output_path = f.name
         success = extract_audio_from_video(input_path, output_path)
-        
         if success:
             with open(output_path, 'rb') as audio_file:
-                await update.message.reply_audio(
-                    audio=audio_file,
-                    filename="extracted_audio.mp3",
-                    performer="Bot",
-                    title="Extracted Audio"
-                )
+                await update.message.reply_audio(audio=audio_file, filename="extracted_audio.mp3", performer="Bot", title="Extracted Audio")
             await processing_msg.delete()
         else:
             await processing_msg.edit_text(LANG[lang]['error'])
-        
         os.unlink(input_path)
         if os.path.exists(output_path):
             os.unlink(output_path)
@@ -1337,61 +1113,32 @@ async def handle_unit_conversion(update: Update, context: ContextTypes.DEFAULT_T
     user = update.effective_user
     if not user:
         return
-    user_id = user.id
-    lang = user_lang.get(user_id, 'fa')
-    
+    lang = user_lang.get(user.id, 'fa')
     text = update.message.text
     if not text:
-        await update.message.reply_text(
-            "📏 Please enter conversion in format:\n`10 meter to kilometer`",
-            parse_mode="Markdown"
-        )
+        await update.message.reply_text("📏 Please enter conversion in format:\n`10 meter to kilometer`", parse_mode="Markdown")
         return
-    
     try:
         parts = text.lower().split(' to ')
         if len(parts) != 2:
-            await update.message.reply_text(
-                "❌ Invalid format. Use:\n`10 meter to kilometer`",
-                parse_mode="Markdown"
-            )
+            await update.message.reply_text("❌ Invalid format. Use:\n`10 meter to kilometer`", parse_mode="Markdown")
             return
-        
         value_str = parts[0].strip()
         to_unit = parts[1].strip()
-        
         value_parts = value_str.split()
         if len(value_parts) < 2:
-            await update.message.reply_text(
-                "❌ Invalid format. Use:\n`10 meter to kilometer`",
-                parse_mode="Markdown"
-            )
+            await update.message.reply_text("❌ Invalid format. Use:\n`10 meter to kilometer`", parse_mode="Markdown")
             return
-        
         value = float(value_parts[0])
         from_unit = ' '.join(value_parts[1:])
-        
-        category = user_sessions.get(user_id, {}).get('unit_category', 'length')
-        
+        category = user_sessions.get(user.id, {}).get('unit_category', 'length')
         result = unit_converter(value, from_unit, to_unit, category)
-        
         if result is not None:
-            await update.message.reply_text(
-                LANG[lang]['unit_result'].format(
-                    result=f"{value} {from_unit} = {result:.4f} {to_unit}"
-                ),
-                reply_markup=build_back_button(lang)
-            )
+            await update.message.reply_text(LANG[lang]['unit_result'].format(result=f"{value} {from_unit} = {result:.4f} {to_unit}"), reply_markup=build_back_button(lang))
         else:
-            await update.message.reply_text(
-                "❌ Conversion failed. Please check your units.",
-                reply_markup=build_back_button(lang)
-            )
+            await update.message.reply_text("❌ Conversion failed. Please check your units.", reply_markup=build_back_button(lang))
     except ValueError:
-        await update.message.reply_text(
-            "❌ Invalid number format. Use:\n`10 meter to kilometer`",
-            parse_mode="Markdown"
-        )
+        await update.message.reply_text("❌ Invalid number format. Use:\n`10 meter to kilometer`", parse_mode="Markdown")
     except Exception as e:
         logger.error(f"Unit conversion error: {e}")
         await update.message.reply_text(LANG[lang]['error'])
@@ -1400,18 +1147,14 @@ async def handle_link(update: Update, context: ContextTypes.DEFAULT_TYPE, url: s
     user = update.effective_user
     if not user:
         return
-    user_id = user.id
-    lang = user_lang.get(user_id, 'fa')
-    
+    lang = user_lang.get(user.id, 'fa')
     if not url.startswith('http'):
         await update.message.reply_text("⚠️ " + LANG[lang]['send_link'])
         return
-    
     processing_msg = await update.message.reply_text(LANG[lang]['processing'])
     try:
         with tempfile.NamedTemporaryFile(delete=False) as tmp:
             output_path = tmp.name
-        
         success = await download_link_to_file(url, output_path)
         if success:
             file_size = os.path.getsize(output_path)
@@ -1420,11 +1163,7 @@ async def handle_link(update: Update, context: ContextTypes.DEFAULT_TYPE, url: s
                 os.unlink(output_path)
                 return
             with open(output_path, 'rb') as f:
-                await update.message.reply_document(
-                    document=f,
-                    filename=os.path.basename(url.split('/')[-1]) or 'file.bin',
-                    caption="📁 File downloaded from link"
-                )
+                await update.message.reply_document(document=f, filename=os.path.basename(url.split('/')[-1]) or 'file.bin', caption="📁 File downloaded from link")
             await processing_msg.delete()
         else:
             await processing_msg.edit_text(LANG[lang]['error'])
@@ -1442,21 +1181,16 @@ async def handle_youtube(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = user.id
     lang = user_lang.get(user_id, 'fa')
     url = update.message.text.strip()
-    
     if "youtube.com" not in url.lower() and "youtu.be" not in url.lower():
         await update.message.reply_text("⚠️ " + LANG[lang]['send_youtube'])
         return
-    
     processing_msg = await update.message.reply_text(LANG[lang]['processing'])
-    
     ydl_opts = {
-        'quiet': True,
-        'no_warnings': True,
+        'quiet': True, 'no_warnings': True,
         'extractor_args': {'youtube': {'player_client': ['tv', 'web'], 'skip': ['dash', 'hls']}},
         'headers': {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'},
         'ignoreerrors': True,
     }
-    
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
@@ -1464,7 +1198,6 @@ async def handle_youtube(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 raise Exception("No info")
             title = info.get('title', 'Video')
             formats = info.get('formats', [])
-            
             keyboard = []
             for res in ['1080p', '720p', '480p', '360p']:
                 height = int(res.replace('p', ''))
@@ -1472,12 +1205,7 @@ async def handle_youtube(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     keyboard.append([InlineKeyboardButton(f"📹 {res}", callback_data=f"yt_video_{res}_{url}")])
             keyboard.append([InlineKeyboardButton("🎵 MP3", callback_data=f"yt_audio_{url}")])
             keyboard.append([InlineKeyboardButton(LANG[lang]['back'], callback_data="main_menu")])
-            
-            await processing_msg.edit_text(
-                f"🎬 **{title}**\n\n{LANG[lang]['choose_quality']}",
-                reply_markup=InlineKeyboardMarkup(keyboard),
-                parse_mode="Markdown"
-            )
+            await processing_msg.edit_text(f"🎬 **{title}**\n\n{LANG[lang]['choose_quality']}", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
     except Exception as e:
         logger.error(f"YouTube error: {e}")
         await processing_msg.edit_text(LANG[lang]['error'])
@@ -1489,38 +1217,27 @@ async def handle_instagram(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = user.id
     lang = user_lang.get(user_id, 'fa')
     url = update.message.text.strip()
-    
     if "instagram.com" not in url.lower():
         await update.message.reply_text("⚠️ " + LANG[lang]['send_instagram'])
         return
-    
     processing_msg = await update.message.reply_text(LANG[lang]['processing'])
-    
     ydl_opts = {
-        'quiet': True,
-        'no_warnings': True,
+        'quiet': True, 'no_warnings': True,
         'headers': {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'},
         'ignoreerrors': True,
     }
-    
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
             if info is None:
                 raise Exception("No info")
-            title = info.get('title', 'Instagram Reel')
-            title = title.replace('Instagram', '').strip()
-            
+            title = info.get('title', 'Instagram Reel').replace('Instagram', '').strip()
             keyboard = [
                 [InlineKeyboardButton("📹 Video (MP4)", callback_data=f"insta_video_{url}")],
                 [InlineKeyboardButton("🎵 Audio (MP3)", callback_data=f"insta_audio_{url}")],
                 [InlineKeyboardButton(LANG[lang]['back'], callback_data="main_menu")]
             ]
-            await processing_msg.edit_text(
-                f"📸 **{title}**\n\nChoose option:",
-                reply_markup=InlineKeyboardMarkup(keyboard),
-                parse_mode="Markdown"
-            )
+            await processing_msg.edit_text(f"📸 **{title}**\n\nChoose option:", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
     except Exception as e:
         logger.error(f"Instagram error: {e}")
         await processing_msg.edit_text(LANG[lang]['error'])
@@ -1534,7 +1251,6 @@ async def youtube_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
     user_id = user.id
     lang = user_lang.get(user_id, 'fa')
-    
     parts = data.split('_')
     if parts[0] == "yt":
         if parts[1] == "video":
@@ -1552,8 +1268,7 @@ async def download_youtube_video(query, url, resolution, lang):
         ydl_opts = {
             'format': f'bestvideo[height<={height}][ext=mp4]+bestaudio[ext=m4a]/best[height<={height}][ext=mp4]',
             'outtmpl': '%(title)s.%(ext)s',
-            'quiet': True,
-            'no_warnings': True,
+            'quiet': True, 'no_warnings': True,
             'extractor_args': {'youtube': {'player_client': ['tv', 'web'], 'skip': ['dash', 'hls']}},
             'headers': {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'},
             'ignoreerrors': True,
@@ -1563,11 +1278,8 @@ async def download_youtube_video(query, url, resolution, lang):
             if info is None:
                 raise Exception("Download failed")
             filepath = ydl.prepare_filename(info)
-            with open(filepath, 'rb') as video_file:
-                await query.message.reply_video(
-                    video=video_file,
-                    caption=f"📹 {info.get('title', 'Video')}\nQuality: {resolution}"
-                )
+            with open(filepath, 'rb') as f:
+                await query.message.reply_video(video=f, caption=f"📹 {info.get('title', 'Video')}\nQuality: {resolution}")
             os.unlink(filepath)
         await query.edit_message_text(LANG[lang]['download_complete'])
     except Exception as e:
@@ -1581,8 +1293,7 @@ async def download_youtube_audio(query, url, lang):
             'format': 'bestaudio[ext=m4a]/bestaudio/best',
             'postprocessors': [{'key': 'FFmpegExtractAudio', 'preferredcodec': 'mp3', 'preferredquality': '192'}],
             'outtmpl': '%(title)s.%(ext)s',
-            'quiet': True,
-            'no_warnings': True,
+            'quiet': True, 'no_warnings': True,
             'extractor_args': {'youtube': {'player_client': ['tv', 'web'], 'skip': ['dash', 'hls']}},
             'headers': {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'},
             'ignoreerrors': True,
@@ -1592,13 +1303,8 @@ async def download_youtube_audio(query, url, lang):
             if info is None:
                 raise Exception("Download failed")
             filepath = ydl.prepare_filename(info).replace('.webm', '.mp3')
-            with open(filepath, 'rb') as audio_file:
-                await query.message.reply_audio(
-                    audio=audio_file,
-                    performer="YouTube",
-                    title=info.get('title', 'Audio'),
-                    caption="🎵 Extracted from YouTube"
-                )
+            with open(filepath, 'rb') as f:
+                await query.message.reply_audio(audio=f, performer="YouTube", title=info.get('title', 'Audio'), caption="🎵 Extracted from YouTube")
             os.unlink(filepath)
         await query.edit_message_text(LANG[lang]['download_complete'])
     except Exception as e:
@@ -1614,7 +1320,6 @@ async def instagram_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     data = query.data
     user_id = user.id
     lang = user_lang.get(user_id, 'fa')
-    
     parts = data.split('_')
     if parts[0] == "insta":
         if parts[1] == "video":
@@ -1630,8 +1335,7 @@ async def download_instagram_video(query, url, lang):
         ydl_opts = {
             'format': 'best[ext=mp4]/best',
             'outtmpl': '%(title)s.%(ext)s',
-            'quiet': True,
-            'no_warnings': True,
+            'quiet': True, 'no_warnings': True,
             'headers': {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'},
             'ignoreerrors': True,
         }
@@ -1640,17 +1344,13 @@ async def download_instagram_video(query, url, lang):
             if info is None:
                 raise Exception("Download failed")
             filepath = ydl.prepare_filename(info)
-            title = info.get('title', 'Instagram Reel')
-            title = title.replace('Instagram', '').strip()
-            with open(filepath, 'rb') as video_file:
-                await query.message.reply_video(
-                    video=video_file,
-                    caption=f"📸 {title}"
-                )
+            title = info.get('title', 'Instagram Reel').replace('Instagram', '').strip()
+            with open(filepath, 'rb') as f:
+                await query.message.reply_video(video=f, caption=f"📸 {title}")
             os.unlink(filepath)
         await query.edit_message_text(LANG[lang]['download_complete'])
     except Exception as e:
-        logger.error(f"Instagram download error: {e}")
+        logger.error(f"Instagram video download error: {e}")
         await query.edit_message_text(LANG[lang]['error'])
 
 async def download_instagram_audio(query, url, lang):
@@ -1660,8 +1360,7 @@ async def download_instagram_audio(query, url, lang):
             'format': 'bestaudio[ext=m4a]/bestaudio/best',
             'postprocessors': [{'key': 'FFmpegExtractAudio', 'preferredcodec': 'mp3', 'preferredquality': '192'}],
             'outtmpl': '%(title)s.%(ext)s',
-            'quiet': True,
-            'no_warnings': True,
+            'quiet': True, 'no_warnings': True,
             'headers': {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'},
             'ignoreerrors': True,
         }
@@ -1670,22 +1369,16 @@ async def download_instagram_audio(query, url, lang):
             if info is None:
                 raise Exception("Download failed")
             filepath = ydl.prepare_filename(info).replace('.webm', '.mp3')
-            title = info.get('title', 'Instagram Reel')
-            title = title.replace('Instagram', '').strip()
-            with open(filepath, 'rb') as audio_file:
-                await query.message.reply_audio(
-                    audio=audio_file,
-                    performer="Instagram",
-                    title=title,
-                    caption="🎵 Audio from Instagram"
-                )
+            title = info.get('title', 'Instagram Reel').replace('Instagram', '').strip()
+            with open(filepath, 'rb') as f:
+                await query.message.reply_audio(audio=f, performer="Instagram", title=title, caption="🎵 Audio from Instagram")
             os.unlink(filepath)
         await query.edit_message_text(LANG[lang]['download_complete'])
     except Exception as e:
         logger.error(f"Instagram audio download error: {e}")
         await query.edit_message_text(LANG[lang]['error'])
 
-# ========== VIDEO CONVERSION CALLBACK ==========
+# ========== VIDEO & IMAGE CONVERSION CALLBACKS ==========
 async def video_conversion_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -1695,11 +1388,9 @@ async def video_conversion_callback(update: Update, context: ContextTypes.DEFAUL
     data = query.data
     user_id = user.id
     lang = user_lang.get(user_id, 'fa')
-    
     if data == "main_menu":
         await main_menu(update, context)
         return
-    
     parts = data.split('_')
     if parts[0] == "vidconv":
         quality = parts[1]
@@ -1708,25 +1399,18 @@ async def video_conversion_callback(update: Update, context: ContextTypes.DEFAUL
         if not file_id:
             await query.edit_message_text(LANG[lang]['file_not_found'])
             return
-        
         await query.edit_message_text(LANG[lang]['processing'])
-        
         try:
             file = await context.bot.get_file(file_id)
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as input_file:
-                input_path = input_file.name
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as f:
+                input_path = f.name
                 await file.download_to_drive(input_path)
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as output_file:
-                output_path = output_file.name
-            
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as f:
+                output_path = f.name
             success = await convert_video_to_mp4(input_path, output_path, quality)
             if success:
-                with open(output_path, 'rb') as vid_file:
-                    await query.message.reply_video(
-                        video=vid_file,
-                        caption=f"📹 MP4 {quality}",
-                        supports_streaming=True
-                    )
+                with open(output_path, 'rb') as vid:
+                    await query.message.reply_video(video=vid, caption=f"📹 MP4 {quality}", supports_streaming=True)
                 await query.edit_message_text(LANG[lang]['download_complete'])
             else:
                 await query.edit_message_text(LANG[lang]['error'])
@@ -1735,10 +1419,9 @@ async def video_conversion_callback(update: Update, context: ContextTypes.DEFAUL
                 os.unlink(output_path)
             temp_storage.pop(ref_id, None)
         except Exception as e:
-            logger.error(f"Video conversion error: {e}")
+            logger.error(f"Video conversion callback error: {e}")
             await query.edit_message_text(LANG[lang]['error'])
 
-# ========== IMAGE CONVERSION CALLBACK ==========
 async def image_conversion_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -1748,11 +1431,9 @@ async def image_conversion_callback(update: Update, context: ContextTypes.DEFAUL
     data = query.data
     user_id = user.id
     lang = user_lang.get(user_id, 'fa')
-    
     if data == "main_menu":
         await main_menu(update, context)
         return
-    
     parts = data.split('_')
     if parts[0] == "imgconv":
         output_format = parts[1]
@@ -1761,25 +1442,22 @@ async def image_conversion_callback(update: Update, context: ContextTypes.DEFAUL
         if not file_id:
             await query.edit_message_text(LANG[lang]['file_not_found'])
             return
-        
         await query.edit_message_text(LANG[lang]['processing'])
-        
         try:
             file = await context.bot.get_file(file_id)
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".img") as input_file:
-                input_path = input_file.name
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".img") as f:
+                input_path = f.name
                 await file.download_to_drive(input_path)
             ext = '.' + output_format
-            with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as output_file:
-                output_path = output_file.name
-            
+            with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as f:
+                output_path = f.name
             success = await convert_image(input_path, output_path, output_format)
             if success:
-                with open(output_path, 'rb') as img_file:
+                with open(output_path, 'rb') as img:
                     if output_format == 'jpg':
-                        await query.message.reply_photo(photo=img_file, caption="🖼 JPG Image")
+                        await query.message.reply_photo(photo=img, caption="🖼 JPG Image")
                     else:
-                        await query.message.reply_document(document=img_file, filename=f"image.{output_format}", caption="🖼 PNG Image")
+                        await query.message.reply_document(document=img, filename=f"image.{output_format}", caption="🖼 PNG Image")
                 await query.edit_message_text(LANG[lang]['download_complete'])
             else:
                 await query.edit_message_text(LANG[lang]['error'])
@@ -1788,7 +1466,7 @@ async def image_conversion_callback(update: Update, context: ContextTypes.DEFAUL
                 os.unlink(output_path)
             temp_storage.pop(ref_id, None)
         except Exception as e:
-            logger.error(f"Image conversion error: {e}")
+            logger.error(f"Image conversion callback error: {e}")
             await query.edit_message_text(LANG[lang]['error'])
 
 # ========== CALLBACK HANDLER ==========
@@ -1800,77 +1478,51 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     user_id = user.id
     lang = user_lang.get(user_id, 'fa')
-    
     if data == "main_menu":
         await main_menu(update, context)
-        return
-    
-    if data == "check_subscription":
+    elif data == "check_subscription":
         await check_subscription_callback(update, context)
-        return
-    
-    if data == "toggle_lang":
+    elif data == "toggle_lang":
         await toggle_language(update, context)
-        return
-    
-    if data == "create_pdf":
+    elif data == "create_pdf":
         await create_pdf_from_images(update, context)
-        return
-    
-    if data == "create_zip":
+    elif data == "create_zip":
         await create_zip_from_files(update, context)
-        return
-    
-    if data.startswith("unit_"):
+    elif data.startswith("unit_"):
         await unit_convert_callback(update, context)
-        return
-    
-    if data.startswith("vidconv_"):
+    elif data.startswith("vidconv_"):
         await video_conversion_callback(update, context)
-        return
-    
-    if data.startswith("imgconv_"):
+    elif data.startswith("imgconv_"):
         await image_conversion_callback(update, context)
-        return
-    
-    if data.startswith("yt_"):
+    elif data.startswith("yt_"):
         await youtube_callback(update, context)
-        return
-    
-    if data.startswith("insta_"):
+    elif data.startswith("insta_"):
         await instagram_callback(update, context)
-        return
-    
-    menu_options = [
-        'menu_video_convert', 'menu_audio_convert', 'menu_youtube', 'menu_instagram',
-        'menu_image_convert', 'menu_image_to_pdf', 'menu_pdf_to_image', 'menu_qr_generate',
-        'menu_qr_read', 'menu_zip', 'menu_unzip', 'menu_doc_to_pdf', 'menu_text_to_pdf',
-        'menu_audio_extract', 'menu_unit_convert', 'menu_link_download'
-    ]
-    
-    if data in menu_options:
-        await menu_handler(update, context)
+    else:
+        menu_options = [
+            'menu_video_convert', 'menu_audio_convert', 'menu_youtube', 'menu_instagram',
+            'menu_image_convert', 'menu_image_to_pdf', 'menu_pdf_to_image', 'menu_qr_generate',
+            'menu_qr_read', 'menu_zip', 'menu_unzip', 'menu_doc_to_pdf', 'menu_text_to_pdf',
+            'menu_audio_extract', 'menu_unit_convert', 'menu_link_download'
+        ]
+        if data in menu_options:
+            await menu_handler(update, context)
 
 # ========== MAIN MESSAGE HANDLER ==========
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Guard: if no user (e.g., channel post), ignore
     user = update.effective_user
     if not user:
         return
     user_id = user.id
     lang = user_lang.get(user_id, 'fa')
     text = update.message.text or ""
-    
     session = user_sessions.get(user_id, {})
     state = session.get('state', '')
-    
     if text and text.startswith('/'):
         return
-    
     if text.startswith('http') and not state:
         await handle_link(update, context, text)
         return
-    
     if state in ['video_conversion', 'audio_conversion', 'image_conversion', 'image_to_pdf',
                  'pdf_to_image', 'qr_read', 'zip_extract', 'doc_to_pdf', 'audio_extract',
                  'zip_compress', 'link_download', 'unit_value', 'text_to_pdf', 'qr_generate']:
@@ -1881,17 +1533,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await handle_instagram(update, context)
     else:
         if await check_subscription(user_id, context):
-            await update.message.reply_text(
-                LANG[lang]['main_menu'],
-                reply_markup=build_main_menu(lang),
-                parse_mode="Markdown"
-            )
+            await update.message.reply_text(LANG[lang]['main_menu'], reply_markup=build_main_menu(lang), parse_mode="Markdown")
         else:
-            await update.message.reply_text(
-                LANG[lang]['not_allowed'],
-                reply_markup=build_channel_keyboard(lang),
-                parse_mode="Markdown"
-            )
+            await update.message.reply_text(LANG[lang]['not_allowed'], reply_markup=build_channel_keyboard(lang), parse_mode="Markdown")
 
 # ========== STATS (Admin) ==========
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1902,65 +1546,32 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_id not in ADMIN_IDS:
         await update.message.reply_text("❌ You are not authorized to view stats.")
         return
-    
     total_users = len(user_data)
     total_messages = sum(u['total_messages'] for u in user_data.values())
-    
-    stats_text = f"""
-📊 **Bot Statistics**
-
-👥 Total Users: {total_users}
-💬 Total Messages: {total_messages}
-
-**Actions Summary:**
-"""
+    stats_text = f"📊 **Bot Statistics**\n\n👥 Total Users: {total_users}\n💬 Total Messages: {total_messages}\n\n**Actions Summary:**\n"
     action_counts = {}
-    for user in user_data.values():
-        for action, count in user.get('actions', {}).items():
+    for u in user_data.values():
+        for action, count in u.get('actions', {}).items():
             action_counts[action] = action_counts.get(action, 0) + count
-    
     for action, count in action_counts.items():
         stats_text += f"• {action}: {count}\n"
-    
     stats_text += "\n**Top 5 Most Active Users:**\n"
     sorted_users = sorted(user_data.values(), key=lambda x: x['total_messages'], reverse=True)[:5]
-    for i, user in enumerate(sorted_users, 1):
-        name = user.get('first_name', 'Unknown')
-        username = user.get('username', 'No username')
-        stats_text += f"{i}. {name} (@{username}) - {user['total_messages']} messages\n"
-    
+    for i, u in enumerate(sorted_users, 1):
+        name = u.get('first_name', 'Unknown')
+        username = u.get('username', 'No username')
+        stats_text += f"{i}. {name} (@{username}) - {u['total_messages']} messages\n"
     await update.message.reply_text(stats_text, parse_mode="Markdown")
 
 # ========== MAIN ==========
 def main():
     app = Application.builder().token(TOKEN).build()
-    
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("stats", stats))
     app.add_handler(CallbackQueryHandler(callback_handler))
     app.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, handle_message))
-    
     print("🤖 Multipurpose Bot is running...")
     print("✅ All features loaded successfully!")
-    print("📊 17+ Features available:")
-    print("  🎬 Video Converter (720p/1080p/480p)")
-    print("  🎵 Audio Converter (to MP3)")
-    print("  📥 YouTube Downloader")
-    print("  📸 Instagram Downloader")
-    print("  🖼 Image Converter (JPG/PNG)")
-    print("  📄 Image to PDF")
-    print("  📄 PDF to Image")
-    print("  🔲 QR Code Generator")
-    print("  🔍 QR Code Reader", "(disabled if libzbar missing)" if not QR_AVAILABLE else "")
-    print("  📦 ZIP Compressor")
-    print("  📂 ZIP Extractor")
-    print("  📄 Document to PDF (Word/PPT/Excel)")
-    print("  📝 Text to PDF")
-    print("  🎬 Extract Audio from Video")
-    print("  📏 Unit Converter")
-    print("  🔗 Link Downloader")
-    print("  🌐 Language Toggle (Farsi/English)")
-    
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
