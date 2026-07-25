@@ -9,7 +9,7 @@ from pydub import AudioSegment
 
 # ========== CONFIGURATION ==========
 # Read token from environment variable (SECURE)
-TOKEN = os.getenv('8866299232:AAF_Dsvc4-RfYtecbBadN3I6cd1ZRtGjUXE')
+TOKEN = "8866299232:AAF_Dsvc4-RfYtecbBadN3I6cd1ZRtGjUXE"
 
 # If token is missing, raise an error
 if not TOKEN:
